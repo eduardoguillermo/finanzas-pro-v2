@@ -817,12 +817,10 @@ function renderRubros() { if (document.getElementById('screen-config').classList
 function gmRenderFijos()    { v2RenderFijosV2(); }
 function gmRenderServicios(){ v2RenderServiciosV2(); }
 function gmRenderCuotas()   { v2RenderCuotasV2(); }
-</script>
-<script>
+
 // ════════════════════════════════════════════════════
 //  CONSTANTES Y ESTADO GLOBAL
 // ════════════════════════════════════════════════════
-const APP_VERSION = '13.56';
 
 // ── Google Drive (desactivado hasta que el usuario configure Client ID) ─────
 const GM_DRIVE_SCOPE    = 'https://www.googleapis.com/auth/drive.appdata';
@@ -3251,7 +3249,9 @@ if ('serviceWorker' in navigator) {
 // ════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════
-window.addEventListener('DOMContentLoaded', function() {
+window.
+
+addEventListener('DOMContentLoaded', function() {
 
     // ── Cargar datos ────────────────────────────────────────────────────
     let rawData = localStorage.getItem(SKEY);
