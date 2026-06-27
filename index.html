@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1e40af">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
@@ -469,7 +470,354 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 <div id="contenedor-impresion-pwa"></div>
 <div id="top5-rubros" style="display:none;"></div>
 
+
 <script src="xlsx.full.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  NAVEGACIÓN v2
+// ═══════════════════════════════════════════════════════════════
+const APP_VERSION = '2.00';
+
+function v2NavTo(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    const screen = document.getElementById('screen-' + screenId);
+    if (screen) screen.classList.add('active');
+    const btn = document.querySelector('[data-screen="' + screenId + '"]');
+    if (btn) btn.classList.add('active');
+    // Render por pantalla
+    if (screenId === 'inicio')     v2RenderInicio();
+    if (screenId === 'diario')     v2RenderDiario();
+    if (screenId === 'fijos')      v2RenderFijosV2();
+    if (screenId === 'config')     v2RenderConfig();
+    if (screenId === 'registrar')  v2PrepararForm();
+}
+
+function v2SegClick(btn) {
+    const segId = btn.dataset.seg;
+    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('seg-servicios').style.display = segId === 'seg-servicios' ? '' : 'none';
+    document.getElementById('seg-cuotas').style.display    = segId === 'seg-cuotas'    ? '' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER INICIO
+// ═══════════════════════════════════════════════════════════════
+function v2RenderInicio() {
+    const m = calcularMetricas();
+    const mesActual = hoyISO().slice(0,7);
+    const mesDatos  = m.mapaMensual[mesActual] || { ingresos: 0, gastos: 0 };
+    const balance   = mesDatos.ingresos - mesDatos.gastos;
+
+    // KPIs
+    setValColor('kpi-ingresos', fmt(mesDatos.ingresos), true);
+    setValColor('kpi-gastos',   fmt(mesDatos.gastos),   false);
+    const kpiBal = document.getElementById('kpi-balance');
+    kpiBal.textContent = fmt(balance);
+    kpiBal.style.color = balance >= 0 ? 'var(--ingreso)' : 'var(--gasto)';
+
+    // Header
+    document.getElementById('hdr-balance').textContent = fmt(Object.values(m.saldos).reduce((a,v)=>a+v,0));
+    document.getElementById('hdr-mes').textContent = fmt(balance);
+
+    // Vencimientos widget
+    v2RenderVencWidget();
+
+    // Ahorros
+    const saldos = gmSaldosPorSubrubro();
+    const totalAh = Object.values(saldos).reduce((a,v)=>a+v,0);
+    const ahGrid = document.getElementById('inicio-ahorros-grid');
+    if (ahGrid) {
+        ahGrid.innerHTML = DB.ahorros.subrubros.map(s => {
+            const sal = saldos[s.id] || 0;
+            return '<div class="ahorro-card"><div class="ahorro-label">' + s.nombre + '</div><div class="ahorro-val" style="color:' + (sal>=0?'var(--ingreso)':'var(--gasto)') + ';">' + fmt(sal) + '</div></div>';
+        }).join('') + '<div class="ahorro-card"><div class="ahorro-label">Total</div><div class="ahorro-val">' + fmt(totalAh) + '</div></div>';
+    }
+
+    // Últimos 5 movimientos
+    const movs = DB.movimientos.slice(-5).reverse();
+    const listEl = document.getElementById('inicio-movs');
+    if (!movs.length) {
+        listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>Sin movimientos aún</p></div>';
+    } else {
+        listEl.innerHTML = movs.map(m => v2MovHtml(m)).join('');
+    }
+
+    // Top 5
+    renderTop5Rubros();
+    const top5 = document.getElementById('top5-rubros');
+    const top5dest = document.getElementById('inicio-top5');
+    if (top5 && top5dest) top5dest.innerHTML = top5.innerHTML;
+}
+
+function v2RenderVencWidget() {
+    const hoy = hoyISO();
+    const proxDias = [hoy].concat(gmDiasHabilesDesde(hoy, 5));
+    const mesActual = hoy.slice(0,7);
+    const items = [];
+    DB.fijos.servicios.forEach(function(s) {
+        if (s.pagos && s.pagos[mesActual]) return;
+        const venc = mesActual + '-' + String(s.dia).padStart(2,'0');
+        const dias = Math.round((new Date(venc) - new Date(hoy)) / 86400000);
+        if (proxDias.indexOf(venc) !== -1 || dias < 0)
+            items.push({ nombre: s.nombre, monto: s.monto, dias, tipo: 'Servicio' });
+    });
+    DB.fijos.cuotas.filter(c => c.cuotaActual <= c.cuotasTotal).forEach(function(c) {
+        if (c.pagos && c.pagos[mesActual]) return;
+        const venc = mesActual + '-' + String(c.dia).padStart(2,'0');
+        const dias = Math.round((new Date(venc) - new Date(hoy)) / 86400000);
+        if (proxDias.indexOf(venc) !== -1 || dias < 0)
+            items.push({ nombre: c.nombre + ' (' + c.cuotaActual + '/' + c.cuotasTotal + ')', monto: c.monto, dias, tipo: 'Cuota' });
+    });
+    const wrap = document.getElementById('venc-widget-wrap');
+    const list = document.getElementById('venc-widget-list');
+    if (!items.length) { wrap.style.display = 'none'; return; }
+    items.sort((a,b) => a.dias - b.dias);
+    wrap.style.display = '';
+    list.innerHTML = items.map(it => {
+        const color = it.dias < 0 ? 'var(--gasto)' : it.dias <= 2 ? 'var(--transferencia)' : '#ca8a04';
+        const badge = it.dias < 0 ? 'Vencido' : it.dias === 0 ? 'Hoy' : 'En ' + it.dias + 'd';
+        return '<div class="venc-item">'
+            + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">' + it.nombre + '</div>'
+            + '<div style="font-size:11px;color:var(--text-muted);">' + it.tipo + ' · ' + fmt(it.monto) + '</div></div>'
+            + '<span class="badge" style="background:' + color + '20;color:' + color + ';border:1px solid ' + color + '40;">' + badge + '</span>'
+            + '</div>';
+    }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER DIARIO
+// ═══════════════════════════════════════════════════════════════
+function v2RenderDiario() {
+    // Poblar filtro rubros
+    const selRubro = document.getElementById('v2-filtro-rubro');
+    const curRubro = selRubro.value;
+    selRubro.innerHTML = '<option value="">Todos los rubros</option>' + DB.rubros.map(r => '<option value="' + r.id + '"' + (r.id == curRubro ? ' selected' : '') + '>' + r.nombre + '</option>').join('');
+
+    const fTipo   = document.getElementById('v2-filtro-tipo').value;
+    const fRubroId = parseInt(document.getElementById('v2-filtro-rubro').value) || 0;
+    const fDesde  = document.getElementById('v2-filtro-desde').value;
+
+    let movs = DB.movimientos.filter(m => {
+        const tipo = getTipoMov(m);
+        if (fTipo && tipo !== fTipo) return false;
+        if (fRubroId && m.rubroId !== fRubroId) return false;
+        if (fDesde && m.fecha < fDesde) return false;
+        return true;
+    }).slice().reverse();
+
+    const list = document.getElementById('v2-lista-movs');
+    if (!movs.length) {
+        list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>Sin movimientos</p></div>';
+        document.getElementById('v2-diario-footer').textContent = '';
+        return;
+    }
+    list.innerHTML = movs.map(m => v2MovHtml(m, true)).join('');
+    document.getElementById('v2-diario-footer').textContent = movs.length + ' movimiento' + (movs.length!==1?'s':'');
+
+    // Listeners para editar/eliminar
+    list.querySelectorAll('[data-del-mov]').forEach(btn => {
+        btn.addEventListener('click', () => eliminarMovimiento(parseInt(btn.dataset.delMov)));
+    });
+    list.querySelectorAll('[data-edit-mov]').forEach(btn => {
+        btn.addEventListener('click', () => { editarMovimiento(parseInt(btn.dataset.editMov)); v2NavTo('registrar'); });
+    });
+}
+
+function v2MovHtml(mv, actions) {
+    const tipo = getTipoMov(mv);
+    const rubro = DB.rubros.find(r => r.id === mv.rubroId);
+    const cuenta = getCuentas().find(c => c.key === mv.origen);
+    const color = tipo === 'ingreso' ? 'var(--ingreso)' : tipo === 'gasto' ? 'var(--gasto)' : 'var(--transferencia)';
+    const signo = tipo === 'ingreso' ? '+' : tipo === 'gasto' ? '-' : '↔';
+    return '<div class="mov-item">'
+        + '<div class="mov-dot" style="background:' + color + ';"></div>'
+        + '<div class="mov-info">'
+        + '<div class="mov-concepto">' + (mv.concepto || '-') + '</div>'
+        + '<div class="mov-meta">' + mv.fecha + (rubro ? ' · ' + rubro.nombre : '') + (cuenta ? ' · ' + cuenta.label : '') + '</div>'
+        + '</div>'
+        + '<div class="mov-monto" style="color:' + color + ';">' + signo + fmt(parseFloat(mv.monto)||0) + '</div>'
+        + (actions ? '<div style="display:flex;gap:4px;margin-left:6px;">'
+            + '<button data-edit-mov="' + mv.id + '" class="btn btn-ghost btn-sm" style="padding:3px 6px;">✏️</button>'
+            + '<button data-del-mov="' + mv.id + '" class="btn btn-danger btn-sm" style="padding:3px 6px;">✕</button>'
+            + '</div>' : '')
+        + '</div>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  REGISTRAR
+// ═══════════════════════════════════════════════════════════════
+function v2PrepararForm() {
+    const cuentas = getCuentas();
+    const optsC = cuentas.map(c => '<option value="' + c.key + '">' + c.icon + ' ' + c.label + '</option>').join('');
+    document.getElementById('v2-origen').innerHTML = optsC;
+    document.getElementById('v2-transf-origen').innerHTML = optsC;
+    document.getElementById('v2-transf-destino').innerHTML = optsC;
+    // Rubros
+    const optsR = '<option value="">Sin rubro</option>' + DB.rubros.map(r => '<option value="' + r.id + '">' + r.nombre + '</option>').join('');
+    document.getElementById('v2-rubro').innerHTML = optsR;
+    // Fecha hoy
+    if (!document.getElementById('v2-fecha').value) document.getElementById('v2-fecha').value = hoyISO();
+    if (!document.getElementById('v2-transf-fecha').value) document.getElementById('v2-transf-fecha').value = hoyISO();
+}
+
+function v2AlternarForm() {
+    const tipo = document.getElementById('v2-tipo-flujo').value;
+    document.getElementById('v2-form-gi').style.display     = tipo === 'transferencia' ? 'none' : '';
+    document.getElementById('v2-form-transf').style.display = tipo === 'transferencia' ? '' : 'none';
+}
+
+function v2GuardarMovimiento() {
+    const tipo = document.getElementById('v2-tipo-flujo').value;
+    if (tipo === 'transferencia') {
+        const concepto = document.getElementById('v2-transf-concepto').value.trim() || 'Transferencia';
+        const monto    = parseFloat(document.getElementById('v2-transf-monto').value);
+        const fecha    = document.getElementById('v2-transf-fecha').value || hoyISO();
+        const origen   = document.getElementById('v2-transf-origen').value;
+        const destino  = document.getElementById('v2-transf-destino').value;
+        if (isNaN(monto)||monto<=0) { toast('Monto inválido', 'error'); return; }
+        if (origen===destino) { toast('Origen y destino iguales', 'error'); return; }
+        DB.movimientos.push({ id: DB.nid++, concepto, monto, rubroId: 0, origen, destino, fecha });
+    } else {
+        const concepto = document.getElementById('v2-concepto').value.trim();
+        const monto    = parseFloat(document.getElementById('v2-monto').value);
+        const fecha    = document.getElementById('v2-fecha').value || hoyISO();
+        const rubroId  = parseInt(document.getElementById('v2-rubro').value) || 0;
+        const origen   = document.getElementById('v2-origen').value;
+        if (!concepto) { toast('Ingresá un concepto', 'error'); return; }
+        if (isNaN(monto)||monto<=0) { toast('Monto inválido', 'error'); return; }
+        DB.movimientos.push({ id: DB.nid++, concepto, monto, rubroId, origen, destino: null, fecha });
+    }
+    save();
+    // Limpiar form
+    document.getElementById('v2-concepto').value = '';
+    document.getElementById('v2-monto').value    = '';
+    document.getElementById('v2-transf-concepto').value = '';
+    document.getElementById('v2-transf-monto').value    = '';
+    toast('✅ Movimiento registrado', 'success');
+    v2NavTo('inicio');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER FIJOS v2
+// ═══════════════════════════════════════════════════════════════
+function v2RenderFijosV2() {
+    v2RenderServiciosV2();
+    v2RenderCuotasV2();
+}
+
+function v2RenderServiciosV2() {
+    const cont = document.getElementById('v2-servicios-list');
+    if (!cont) return;
+    const svcs = DB.fijos.servicios;
+    if (!svcs.length) { cont.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Sin servicios registrados</p></div>'; return; }
+    const hoy = hoyISO(), mesActual = hoy.slice(0,7);
+    cont.innerHTML = svcs.map(s => {
+        const pagoMes = s.pagos && s.pagos[mesActual];
+        const venc = mesActual + '-' + String(s.dia).padStart(2,'0');
+        const dias = Math.round((new Date(venc) - new Date(hoy)) / 86400000);
+        const color = pagoMes ? 'var(--ingreso)' : dias < 0 ? 'var(--gasto)' : dias <= 2 ? 'var(--transferencia)' : 'var(--border)';
+        const estadoTxt = pagoMes ? '✅ Pagado' : dias < 0 ? '⚠️ Vencido' : 'Vence día ' + s.dia;
+        return '<div class="fijo-item">'
+            + '<div class="fijo-bar" style="background:' + color + ';"></div>'
+            + '<div class="fijo-info"><div class="fijo-nombre">' + s.nombre + '</div>'
+            + '<div class="fijo-meta">' + fmt(s.monto) + ' · <span style="color:' + color + ';font-weight:600;">' + estadoTxt + '</span></div></div>'
+            + '<div class="fijo-actions">'
+            + (pagoMes ? '' : '<button data-pag-svc="' + s.id + '" class="btn btn-success btn-sm">Pagar</button>')
+            + '<button data-edit-svc="' + s.id + '" class="btn btn-ghost btn-sm" style="padding:3px 6px;">✏️</button>'
+            + '<button data-del-svc="' + s.id + '" class="btn btn-danger btn-sm" style="padding:3px 6px;">✕</button>'
+            + '</div></div>';
+    }).join('');
+    cont.querySelectorAll('[data-pag-svc]').forEach(btn => btn.addEventListener('click', () => { gmPagarServicio(parseInt(btn.dataset.pagSvc)); }));
+    cont.querySelectorAll('[data-edit-svc]').forEach(btn => btn.addEventListener('click', () => gmAbrirFormServicio(parseInt(btn.dataset.editSvc))));
+    cont.querySelectorAll('[data-del-svc]').forEach(btn => btn.addEventListener('click', () => gmEliminarServicio(parseInt(btn.dataset.delSvc))));
+}
+
+function v2RenderCuotasV2() {
+    const cont = document.getElementById('v2-cuotas-list');
+    if (!cont) return;
+    const cuotas = DB.fijos.cuotas.filter(c => c.cuotaActual <= c.cuotasTotal);
+    if (!cuotas.length) { cont.innerHTML = '<div class="empty-state"><div class="empty-icon">💳</div><p>Sin cuotas activas</p></div>'; return; }
+    const hoy = hoyISO(), mesActual = hoy.slice(0,7);
+    cont.innerHTML = cuotas.map(c => {
+        const pagadaMes = c.pagos && c.pagos[mesActual];
+        const venc = mesActual + '-' + String(c.dia).padStart(2,'0');
+        const dias = Math.round((new Date(venc) - new Date(hoy)) / 86400000);
+        const color = pagadaMes ? 'var(--ingreso)' : dias < 0 ? 'var(--gasto)' : dias <= 2 ? 'var(--transferencia)' : 'var(--border)';
+        const estadoTxt = pagadaMes ? '✅ Pagada' : dias < 0 ? '⚠️ Vencida' : 'Vence día ' + c.dia;
+        const pct = Math.round((c.cuotaActual-1)/c.cuotasTotal*100);
+        return '<div class="fijo-item" style="flex-direction:column;align-items:stretch;">'
+            + '<div style="display:flex;align-items:center;gap:10px;">'
+            + '<div class="fijo-bar" style="background:' + color + ';height:40px;"></div>'
+            + '<div class="fijo-info"><div class="fijo-nombre">' + c.nombre + '</div>'
+            + '<div class="fijo-meta">' + fmt(c.monto) + '/cuota · Cuota ' + c.cuotaActual + '/' + c.cuotasTotal + '</div>'
+            + '<div class="fijo-meta"><span style="color:' + color + ';font-weight:600;">' + estadoTxt + '</span></div></div>'
+            + '<div class="fijo-actions">'
+            + (pagadaMes ? '' : '<button data-pag-cuota="' + c.id + '" class="btn btn-success btn-sm">Pagar</button>')
+            + '<button data-edit-cuota="' + c.id + '" class="btn btn-ghost btn-sm" style="padding:3px 6px;">✏️</button>'
+            + '<button data-del-cuota="' + c.id + '" class="btn btn-danger btn-sm" style="padding:3px 6px;">✕</button>'
+            + '</div></div>'
+            + '<div class="progress" style="margin:6px 0 0 14px;"><div class="progress-bar" style="width:' + pct + '%;background:' + color + ';"></div></div>'
+            + '</div>';
+    }).join('');
+    cont.querySelectorAll('[data-pag-cuota]').forEach(btn => btn.addEventListener('click', () => gmPagarCuota(parseInt(btn.dataset.pagCuota))));
+    cont.querySelectorAll('[data-edit-cuota]').forEach(btn => btn.addEventListener('click', () => gmAbrirFormCuota(parseInt(btn.dataset.editCuota))));
+    cont.querySelectorAll('[data-del-cuota]').forEach(btn => btn.addEventListener('click', () => gmEliminarCuota(parseInt(btn.dataset.delCuota))));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER CONFIG
+// ═══════════════════════════════════════════════════════════════
+function v2RenderConfig() {
+    const cuentas = getCuentas();
+    document.getElementById('cfg-debito1').value = DB.cuentas.debito1 || '';
+    document.getElementById('cfg-debito2').value = DB.cuentas.debito2 || '';
+    document.getElementById('cfg-debito3').value = DB.cuentas.debito3 || '';
+    // Rubros lista
+    const lista = document.getElementById('rubros-lista');
+    if (lista) {
+        lista.innerHTML = DB.rubros.map(r => '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);">'
+            + '<span style="flex:1;font-size:13px;">' + r.nombre + ' <span style="font-size:10px;color:var(--text-muted);">(' + r.tipo + ')</span></span>'
+            + '<button data-edit-rub="' + r.id + '" class="btn btn-ghost btn-sm" style="padding:3px 6px;">✏️</button>'
+            + '<button data-del-rub="' + r.id + '" class="btn btn-danger btn-sm" style="padding:3px 6px;">✕</button>'
+            + '</div>').join('');
+        lista.querySelectorAll('[data-edit-rub]').forEach(btn => btn.addEventListener('click', () => editarRubro(parseInt(btn.dataset.editRub))));
+        lista.querySelectorAll('[data-del-rub]').forEach(btn => btn.addEventListener('click', () => eliminarRubro(parseInt(btn.dataset.delRub))));
+    }
+    gmActualizarBotonesDrive();
+    const savedId = gmGetClientId();
+    if (savedId) document.getElementById('cfg-drive-client-id').value = savedId;
+}
+
+function v2AbrirHistorial() { gmAbrirHistorial(); }
+
+// ═══════════════════════════════════════════════════════════════
+//  OVERRIDE: post-save render
+// ═══════════════════════════════════════════════════════════════
+function render() {
+    // En v2 el render actualiza la pantalla activa
+    const active = document.querySelector('.screen.active');
+    if (!active) return;
+    const id = active.id.replace('screen-','');
+    if (id === 'inicio')  v2RenderInicio();
+    if (id === 'diario')  v2RenderDiario();
+    if (id === 'fijos')   v2RenderFijosV2();
+    if (id === 'config')  v2RenderConfig();
+    // Actualizar header KPIs siempre
+    const m = calcularMetricas();
+    const bal = Object.values(m.saldos).reduce((a,v)=>a+v,0);
+    document.getElementById('hdr-balance').textContent = fmt(bal);
+}
+
+// Render de rubros para Config (override)
+function renderRubros() { if (document.getElementById('screen-config').classList.contains('active')) v2RenderConfig(); }
+
+// Overrides para gmRenderFijos
+function gmRenderFijos()    { v2RenderFijosV2(); }
+function gmRenderServicios(){ v2RenderServiciosV2(); }
+function gmRenderCuotas()   { v2RenderCuotasV2(); }
+</script>
 <script>
 // ════════════════════════════════════════════════════
 //  CONSTANTES Y ESTADO GLOBAL
@@ -2979,352 +3327,6 @@ window.addEventListener('DOMContentLoaded', function() {
     // ── Vencimientos (después del splash) ────────────────────────────────
     setTimeout(() => v2RenderVencWidget(), 2500);
 });
-</script>
-<script>
-// ═══════════════════════════════════════════════════════════════
-//  NAVEGACIÓN v2
-// ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '2.00';
-
-function v2NavTo(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    const screen = document.getElementById('screen-' + screenId);
-    if (screen) screen.classList.add('active');
-    const btn = document.querySelector('[data-screen="' + screenId + '"]');
-    if (btn) btn.classList.add('active');
-    // Render por pantalla
-    if (screenId === 'inicio')     v2RenderInicio();
-    if (screenId === 'diario')     v2RenderDiario();
-    if (screenId === 'fijos')      v2RenderFijosV2();
-    if (screenId === 'config')     v2RenderConfig();
-    if (screenId === 'registrar')  v2PrepararForm();
-}
-
-function v2SegClick(btn) {
-    const segId = btn.dataset.seg;
-    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('seg-servicios').style.display = segId === 'seg-servicios' ? '' : 'none';
-    document.getElementById('seg-cuotas').style.display    = segId === 'seg-cuotas'    ? '' : 'none';
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  RENDER INICIO
-// ═══════════════════════════════════════════════════════════════
-function v2RenderInicio() {
-    const m = calcularMetricas();
-    const mesActual = hoyISO().slice(0,7);
-    const mesDatos  = m.mapaMensual[mesActual] || { ingresos: 0, gastos: 0 };
-    const balance   = mesDatos.ingresos - mesDatos.gastos;
-
-    // KPIs
-    setValColor('kpi-ingresos', fmt(mesDatos.ingresos), true);
-    setValColor('kpi-gastos',   fmt(mesDatos.gastos),   false);
-    const kpiBal = document.getElementById('kpi-balance');
-    kpiBal.textContent = fmt(balance);
-    kpiBal.style.color = balance >= 0 ? 'var(--ingreso)' : 'var(--gasto)';
-
-    // Header
-    document.getElementById('hdr-balance').textContent = fmt(Object.values(m.saldos).reduce((a,v)=>a+v,0));
-    document.getElementById('hdr-mes').textContent = fmt(balance);
-
-    // Vencimientos widget
-    v2RenderVencWidget();
-
-    // Ahorros
-    const saldos = gmSaldosPorSubrubro();
-    const totalAh = Object.values(saldos).reduce((a,v)=>a+v,0);
-    const ahGrid = document.getElementById('inicio-ahorros-grid');
-    if (ahGrid) {
-        ahGrid.innerHTML = DB.ahorros.subrubros.map(s => {
-            const sal = saldos[s.id] || 0;
-            return '<div class="ahorro-card"><div class="ahorro-label">' + s.nombre + '</div><div class="ahorro-val" style="color:' + (sal>=0?'var(--ingreso)':'var(--gasto)') + ';">' + fmt(sal) + '</div></div>';
-        }).join('') + '<div class="ahorro-card"><div class="ahorro-label">Total</div><div class="ahorro-val">' + fmt(totalAh) + '</div></div>';
-    }
-
-    // Últimos 5 movimientos
-    const movs = DB.movimientos.slice(-5).reverse();
-    const listEl = document.getElementById('inicio-movs');
-    if (!movs.length) {
-        listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>Sin movimientos aún</p></div>';
-    } else {
-        listEl.innerHTML = movs.map(m => v2MovHtml(m)).join('');
-    }
-
-    // Top 5
-    renderTop5Rubros();
-    const top5 = document.getElementById('top5-rubros');
-    const top5dest = document.getElementById('inicio-top5');
-    if (top5 && top5dest) top5dest.innerHTML = top5.innerHTML;
-}
-
-function v2RenderVencWidget() {
-    const hoy = hoyISO();
-    const proxDias = [hoy].concat(gmDiasHabilesDesde(hoy, 5));
-    const mesActual = hoy.slice(0,7);
-    const items = [];
-    DB.fijos.servicios.forEach(function(s) {
-        if (s.pagos && s.pagos[mesActual]) return;
-        const venc = mesActual + '-' + String(s.dia).padStart(2,'0');
-        const dias = Math.round((new Date(venc) - new Date(hoy)) / 86400000);
-        if (proxDias.indexOf(venc) !== -1 || dias < 0)
-            items.push({ nombre: s.nombre, monto: s.monto, dias, tipo: 'Servicio' });
-    });
-    DB.fijos.cuotas.filter(c => c.cuotaActual <= c.cuotasTotal).forEach(function(c) {
-        if (c.pagos && c.pagos[mesActual]) return;
-        const venc = mesActual + '-' + String(c.dia).padStart(2,'0');
-        const dias = Math.round((new Date(venc) - new Date(hoy)) / 86400000);
-        if (proxDias.indexOf(venc) !== -1 || dias < 0)
-            items.push({ nombre: c.nombre + ' (' + c.cuotaActual + '/' + c.cuotasTotal + ')', monto: c.monto, dias, tipo: 'Cuota' });
-    });
-    const wrap = document.getElementById('venc-widget-wrap');
-    const list = document.getElementById('venc-widget-list');
-    if (!items.length) { wrap.style.display = 'none'; return; }
-    items.sort((a,b) => a.dias - b.dias);
-    wrap.style.display = '';
-    list.innerHTML = items.map(it => {
-        const color = it.dias < 0 ? 'var(--gasto)' : it.dias <= 2 ? 'var(--transferencia)' : '#ca8a04';
-        const badge = it.dias < 0 ? 'Vencido' : it.dias === 0 ? 'Hoy' : 'En ' + it.dias + 'd';
-        return '<div class="venc-item">'
-            + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">' + it.nombre + '</div>'
-            + '<div style="font-size:11px;color:var(--text-muted);">' + it.tipo + ' · ' + fmt(it.monto) + '</div></div>'
-            + '<span class="badge" style="background:' + color + '20;color:' + color + ';border:1px solid ' + color + '40;">' + badge + '</span>'
-            + '</div>';
-    }).join('');
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  RENDER DIARIO
-// ═══════════════════════════════════════════════════════════════
-function v2RenderDiario() {
-    // Poblar filtro rubros
-    const selRubro = document.getElementById('v2-filtro-rubro');
-    const curRubro = selRubro.value;
-    selRubro.innerHTML = '<option value="">Todos los rubros</option>' + DB.rubros.map(r => '<option value="' + r.id + '"' + (r.id == curRubro ? ' selected' : '') + '>' + r.nombre + '</option>').join('');
-
-    const fTipo   = document.getElementById('v2-filtro-tipo').value;
-    const fRubroId = parseInt(document.getElementById('v2-filtro-rubro').value) || 0;
-    const fDesde  = document.getElementById('v2-filtro-desde').value;
-
-    let movs = DB.movimientos.filter(m => {
-        const tipo = getTipoMov(m);
-        if (fTipo && tipo !== fTipo) return false;
-        if (fRubroId && m.rubroId !== fRubroId) return false;
-        if (fDesde && m.fecha < fDesde) return false;
-        return true;
-    }).slice().reverse();
-
-    const list = document.getElementById('v2-lista-movs');
-    if (!movs.length) {
-        list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>Sin movimientos</p></div>';
-        document.getElementById('v2-diario-footer').textContent = '';
-        return;
-    }
-    list.innerHTML = movs.map(m => v2MovHtml(m, true)).join('');
-    document.getElementById('v2-diario-footer').textContent = movs.length + ' movimiento' + (movs.length!==1?'s':'');
-
-    // Listeners para editar/eliminar
-    list.querySelectorAll('[data-del-mov]').forEach(btn => {
-        btn.addEventListener('click', () => eliminarMovimiento(parseInt(btn.dataset.delMov)));
-    });
-    list.querySelectorAll('[data-edit-mov]').forEach(btn => {
-        btn.addEventListener('click', () => { editarMovimiento(parseInt(btn.dataset.editMov)); v2NavTo('registrar'); });
-    });
-}
-
-function v2MovHtml(mv, actions) {
-    const tipo = getTipoMov(mv);
-    const rubro = DB.rubros.find(r => r.id === mv.rubroId);
-    const cuenta = getCuentas().find(c => c.key === mv.origen);
-    const color = tipo === 'ingreso' ? 'var(--ingreso)' : tipo === 'gasto' ? 'var(--gasto)' : 'var(--transferencia)';
-    const signo = tipo === 'ingreso' ? '+' : tipo === 'gasto' ? '-' : '↔';
-    return '<div class="mov-item">'
-        + '<div class="mov-dot" style="background:' + color + ';"></div>'
-        + '<div class="mov-info">'
-        + '<div class="mov-concepto">' + (mv.concepto || '-') + '</div>'
-        + '<div class="mov-meta">' + mv.fecha + (rubro ? ' · ' + rubro.nombre : '') + (cuenta ? ' · ' + cuenta.label : '') + '</div>'
-        + '</div>'
-        + '<div class="mov-monto" style="color:' + color + ';">' + signo + fmt(parseFloat(mv.monto)||0) + '</div>'
-        + (actions ? '<div style="display:flex;gap:4px;margin-left:6px;">'
-            + '<button data-edit-mov="' + mv.id + '" class="btn btn-ghost btn-sm" style="padding:3px 6px;">✏️</button>'
-            + '<button data-del-mov="' + mv.id + '" class="btn btn-danger btn-sm" style="padding:3px 6px;">✕</button>'
-            + '</div>' : '')
-        + '</div>';
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  REGISTRAR
-// ═══════════════════════════════════════════════════════════════
-function v2PrepararForm() {
-    const cuentas = getCuentas();
-    const optsC = cuentas.map(c => '<option value="' + c.key + '">' + c.icon + ' ' + c.label + '</option>').join('');
-    document.getElementById('v2-origen').innerHTML = optsC;
-    document.getElementById('v2-transf-origen').innerHTML = optsC;
-    document.getElementById('v2-transf-destino').innerHTML = optsC;
-    // Rubros
-    const optsR = '<option value="">Sin rubro</option>' + DB.rubros.map(r => '<option value="' + r.id + '">' + r.nombre + '</option>').join('');
-    document.getElementById('v2-rubro').innerHTML = optsR;
-    // Fecha hoy
-    if (!document.getElementById('v2-fecha').value) document.getElementById('v2-fecha').value = hoyISO();
-    if (!document.getElementById('v2-transf-fecha').value) document.getElementById('v2-transf-fecha').value = hoyISO();
-}
-
-function v2AlternarForm() {
-    const tipo = document.getElementById('v2-tipo-flujo').value;
-    document.getElementById('v2-form-gi').style.display     = tipo === 'transferencia' ? 'none' : '';
-    document.getElementById('v2-form-transf').style.display = tipo === 'transferencia' ? '' : 'none';
-}
-
-function v2GuardarMovimiento() {
-    const tipo = document.getElementById('v2-tipo-flujo').value;
-    if (tipo === 'transferencia') {
-        const concepto = document.getElementById('v2-transf-concepto').value.trim() || 'Transferencia';
-        const monto    = parseFloat(document.getElementById('v2-transf-monto').value);
-        const fecha    = document.getElementById('v2-transf-fecha').value || hoyISO();
-        const origen   = document.getElementById('v2-transf-origen').value;
-        const destino  = document.getElementById('v2-transf-destino').value;
-        if (isNaN(monto)||monto<=0) { toast('Monto inválido', 'error'); return; }
-        if (origen===destino) { toast('Origen y destino iguales', 'error'); return; }
-        DB.movimientos.push({ id: DB.nid++, concepto, monto, rubroId: 0, origen, destino, fecha });
-    } else {
-        const concepto = document.getElementById('v2-concepto').value.trim();
-        const monto    = parseFloat(document.getElementById('v2-monto').value);
-        const fecha    = document.getElementById('v2-fecha').value || hoyISO();
-        const rubroId  = parseInt(document.getElementById('v2-rubro').value) || 0;
-        const origen   = document.getElementById('v2-origen').value;
-        if (!concepto) { toast('Ingresá un concepto', 'error'); return; }
-        if (isNaN(monto)||monto<=0) { toast('Monto inválido', 'error'); return; }
-        DB.movimientos.push({ id: DB.nid++, concepto, monto, rubroId, origen, destino: null, fecha });
-    }
-    save();
-    // Limpiar form
-    document.getElementById('v2-concepto').value = '';
-    document.getElementById('v2-monto').value    = '';
-    document.getElementById('v2-transf-concepto').value = '';
-    document.getElementById('v2-transf-monto').value    = '';
-    toast('✅ Movimiento registrado', 'success');
-    v2NavTo('inicio');
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  RENDER FIJOS v2
-// ═══════════════════════════════════════════════════════════════
-function v2RenderFijosV2() {
-    v2RenderServiciosV2();
-    v2RenderCuotasV2();
-}
-
-function v2RenderServiciosV2() {
-    const cont = document.getElementById('v2-servicios-list');
-    if (!cont) return;
-    const svcs = DB.fijos.servicios;
-    if (!svcs.length) { cont.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Sin servicios registrados</p></div>'; return; }
-    const hoy = hoyISO(), mesActual = hoy.slice(0,7);
-    cont.innerHTML = svcs.map(s => {
-        const pagoMes = s.pagos && s.pagos[mesActual];
-        const venc = mesActual + '-' + String(s.dia).padStart(2,'0');
-        const dias = Math.round((new Date(venc) - new Date(hoy)) / 86400000);
-        const color = pagoMes ? 'var(--ingreso)' : dias < 0 ? 'var(--gasto)' : dias <= 2 ? 'var(--transferencia)' : 'var(--border)';
-        const estadoTxt = pagoMes ? '✅ Pagado' : dias < 0 ? '⚠️ Vencido' : 'Vence día ' + s.dia;
-        return '<div class="fijo-item">'
-            + '<div class="fijo-bar" style="background:' + color + ';"></div>'
-            + '<div class="fijo-info"><div class="fijo-nombre">' + s.nombre + '</div>'
-            + '<div class="fijo-meta">' + fmt(s.monto) + ' · <span style="color:' + color + ';font-weight:600;">' + estadoTxt + '</span></div></div>'
-            + '<div class="fijo-actions">'
-            + (pagoMes ? '' : '<button data-pag-svc="' + s.id + '" class="btn btn-success btn-sm">Pagar</button>')
-            + '<button data-edit-svc="' + s.id + '" class="btn btn-ghost btn-sm" style="padding:3px 6px;">✏️</button>'
-            + '<button data-del-svc="' + s.id + '" class="btn btn-danger btn-sm" style="padding:3px 6px;">✕</button>'
-            + '</div></div>';
-    }).join('');
-    cont.querySelectorAll('[data-pag-svc]').forEach(btn => btn.addEventListener('click', () => { gmPagarServicio(parseInt(btn.dataset.pagSvc)); }));
-    cont.querySelectorAll('[data-edit-svc]').forEach(btn => btn.addEventListener('click', () => gmAbrirFormServicio(parseInt(btn.dataset.editSvc))));
-    cont.querySelectorAll('[data-del-svc]').forEach(btn => btn.addEventListener('click', () => gmEliminarServicio(parseInt(btn.dataset.delSvc))));
-}
-
-function v2RenderCuotasV2() {
-    const cont = document.getElementById('v2-cuotas-list');
-    if (!cont) return;
-    const cuotas = DB.fijos.cuotas.filter(c => c.cuotaActual <= c.cuotasTotal);
-    if (!cuotas.length) { cont.innerHTML = '<div class="empty-state"><div class="empty-icon">💳</div><p>Sin cuotas activas</p></div>'; return; }
-    const hoy = hoyISO(), mesActual = hoy.slice(0,7);
-    cont.innerHTML = cuotas.map(c => {
-        const pagadaMes = c.pagos && c.pagos[mesActual];
-        const venc = mesActual + '-' + String(c.dia).padStart(2,'0');
-        const dias = Math.round((new Date(venc) - new Date(hoy)) / 86400000);
-        const color = pagadaMes ? 'var(--ingreso)' : dias < 0 ? 'var(--gasto)' : dias <= 2 ? 'var(--transferencia)' : 'var(--border)';
-        const estadoTxt = pagadaMes ? '✅ Pagada' : dias < 0 ? '⚠️ Vencida' : 'Vence día ' + c.dia;
-        const pct = Math.round((c.cuotaActual-1)/c.cuotasTotal*100);
-        return '<div class="fijo-item" style="flex-direction:column;align-items:stretch;">'
-            + '<div style="display:flex;align-items:center;gap:10px;">'
-            + '<div class="fijo-bar" style="background:' + color + ';height:40px;"></div>'
-            + '<div class="fijo-info"><div class="fijo-nombre">' + c.nombre + '</div>'
-            + '<div class="fijo-meta">' + fmt(c.monto) + '/cuota · Cuota ' + c.cuotaActual + '/' + c.cuotasTotal + '</div>'
-            + '<div class="fijo-meta"><span style="color:' + color + ';font-weight:600;">' + estadoTxt + '</span></div></div>'
-            + '<div class="fijo-actions">'
-            + (pagadaMes ? '' : '<button data-pag-cuota="' + c.id + '" class="btn btn-success btn-sm">Pagar</button>')
-            + '<button data-edit-cuota="' + c.id + '" class="btn btn-ghost btn-sm" style="padding:3px 6px;">✏️</button>'
-            + '<button data-del-cuota="' + c.id + '" class="btn btn-danger btn-sm" style="padding:3px 6px;">✕</button>'
-            + '</div></div>'
-            + '<div class="progress" style="margin:6px 0 0 14px;"><div class="progress-bar" style="width:' + pct + '%;background:' + color + ';"></div></div>'
-            + '</div>';
-    }).join('');
-    cont.querySelectorAll('[data-pag-cuota]').forEach(btn => btn.addEventListener('click', () => gmPagarCuota(parseInt(btn.dataset.pagCuota))));
-    cont.querySelectorAll('[data-edit-cuota]').forEach(btn => btn.addEventListener('click', () => gmAbrirFormCuota(parseInt(btn.dataset.editCuota))));
-    cont.querySelectorAll('[data-del-cuota]').forEach(btn => btn.addEventListener('click', () => gmEliminarCuota(parseInt(btn.dataset.delCuota))));
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  RENDER CONFIG
-// ═══════════════════════════════════════════════════════════════
-function v2RenderConfig() {
-    const cuentas = getCuentas();
-    document.getElementById('cfg-debito1').value = DB.cuentas.debito1 || '';
-    document.getElementById('cfg-debito2').value = DB.cuentas.debito2 || '';
-    document.getElementById('cfg-debito3').value = DB.cuentas.debito3 || '';
-    // Rubros lista
-    const lista = document.getElementById('rubros-lista');
-    if (lista) {
-        lista.innerHTML = DB.rubros.map(r => '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);">'
-            + '<span style="flex:1;font-size:13px;">' + r.nombre + ' <span style="font-size:10px;color:var(--text-muted);">(' + r.tipo + ')</span></span>'
-            + '<button data-edit-rub="' + r.id + '" class="btn btn-ghost btn-sm" style="padding:3px 6px;">✏️</button>'
-            + '<button data-del-rub="' + r.id + '" class="btn btn-danger btn-sm" style="padding:3px 6px;">✕</button>'
-            + '</div>').join('');
-        lista.querySelectorAll('[data-edit-rub]').forEach(btn => btn.addEventListener('click', () => editarRubro(parseInt(btn.dataset.editRub))));
-        lista.querySelectorAll('[data-del-rub]').forEach(btn => btn.addEventListener('click', () => eliminarRubro(parseInt(btn.dataset.delRub))));
-    }
-    gmActualizarBotonesDrive();
-    const savedId = gmGetClientId();
-    if (savedId) document.getElementById('cfg-drive-client-id').value = savedId;
-}
-
-function v2AbrirHistorial() { gmAbrirHistorial(); }
-
-// ═══════════════════════════════════════════════════════════════
-//  OVERRIDE: post-save render
-// ═══════════════════════════════════════════════════════════════
-function render() {
-    // En v2 el render actualiza la pantalla activa
-    const active = document.querySelector('.screen.active');
-    if (!active) return;
-    const id = active.id.replace('screen-','');
-    if (id === 'inicio')  v2RenderInicio();
-    if (id === 'diario')  v2RenderDiario();
-    if (id === 'fijos')   v2RenderFijosV2();
-    if (id === 'config')  v2RenderConfig();
-    // Actualizar header KPIs siempre
-    const m = calcularMetricas();
-    const bal = Object.values(m.saldos).reduce((a,v)=>a+v,0);
-    document.getElementById('hdr-balance').textContent = fmt(bal);
-}
-
-// Render de rubros para Config (override)
-function renderRubros() { if (document.getElementById('screen-config').classList.contains('active')) v2RenderConfig(); }
-
-// Overrides para gmRenderFijos
-function gmRenderFijos()    { v2RenderFijosV2(); }
-function gmRenderServicios(){ v2RenderServiciosV2(); }
-function gmRenderCuotas()   { v2RenderCuotasV2(); }
 </script>
 </body>
 </html>
