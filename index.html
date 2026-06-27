@@ -2905,7 +2905,7 @@ if ('serviceWorker' in navigator) {
 // ════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', function() {
 
-    // Cargar datos
+    // ── Cargar datos ────────────────────────────────────────────────────
     let rawData = localStorage.getItem(SKEY);
     if (!rawData) {
         for (const k of LEGACY_KEYS) {
@@ -2916,23 +2916,14 @@ window.addEventListener('DOMContentLoaded', function() {
     if (rawData) {
         try {
             DB = migrar(JSON.parse(rawData));
-            // Re-normalizar fechas de movimientos ya guardados en localStorage
             DB.movimientos.forEach(m => { m.fecha = normalizarFecha(m.fecha); });
             saveImmediate();
-        }
-        catch(e) { console.error('Error al cargar datos:', e); }
+        } catch(e) { console.error('Error al cargar datos:', e); }
     } else {
         saveImmediate();
     }
 
-    // Configurar campos
-    document.getElementById('cfg-debito1').value = DB.cuentas.debito1;
-    document.getElementById('cfg-debito2').value = DB.cuentas.debito2;
-    document.getElementById('cfg-debito3').value = DB.cuentas.debito3 || '';
-    document.getElementById('mov-fecha').value   = hoyISO();
-
-    // Eventos
-    // Modal
+    // ── Modal confirm (siempre presente en v2) ──────────────────────────
     document.getElementById('modal-confirm').addEventListener('click', () => {
         document.getElementById('modal-overlay').classList.remove('active');
         if (_modalResolve) { _modalResolve(true); _modalResolve = null; }
@@ -2942,64 +2933,51 @@ window.addEventListener('DOMContentLoaded', function() {
         if (_modalResolve) { _modalResolve(false); _modalResolve = null; }
     });
 
-    initTabs();
-    initMesesVisor();
+    // ── Eventos de Config (btn-guardar-rubro, btn-guardar-bancos) ───────
+    const btnGRubro  = document.getElementById('btn-guardar-rubro');
+    const btnCRubro  = document.getElementById('btn-cancelar-rubro');
+    const btnGBancos = document.getElementById('btn-guardar-bancos');
+    const elRubroTipo = document.getElementById('rubro-tipo');
+    if (btnGRubro)  btnGRubro.addEventListener('click', guardarRubro);
+    if (btnCRubro)  btnCRubro.addEventListener('click', cancelarEdicionRubro);
+    if (btnGBancos) btnGBancos.addEventListener('click', guardarCuentas);
+    if (elRubroTipo) elRubroTipo.addEventListener('change', alternarInputPresupuesto);
 
-    document.getElementById('mov-tipo-flujo').addEventListener('change', alternarFormCarga);
-    document.getElementById('rubro-tipo').addEventListener('change', alternarInputPresupuesto);
-    document.getElementById('btn-guardar-rubro').addEventListener('click', guardarRubro);
-    document.getElementById('btn-cancelar-rubro').addEventListener('click', cancelarEdicionRubro);
-    document.getElementById('btn-guardar-movimiento').addEventListener('click', guardarMovimiento);
-    document.getElementById('btn-guardar-bancos').addEventListener('click', guardarCuentas);
-    document.getElementById('filtro-avanzado').addEventListener('change', () => { resetPaginacion(); render(); });
-    document.getElementById('filtro-fecha-desde').addEventListener('change', () => { resetPaginacion(); render(); });
-    document.getElementById('filtro-fecha-hasta').addEventListener('change', () => { resetPaginacion(); render(); });
-    document.getElementById('rubro-mes-visor').addEventListener('change', render);
+    // ── Render inicial ───────────────────────────────────────────────────
+    v2RenderInicio();
 
-    // Atajo teclado: Enter en formulario
-    ['mov-concepto','mov-monto','mov-fecha'].forEach(id => {
-        document.getElementById(id).addEventListener('keydown', e => {
-            if (e.key === 'Enter') { e.preventDefault(); guardarMovimiento(); }
-        });
+    // ── Drive ────────────────────────────────────────────────────────────
+    const savedClientId = gmGetClientId();
+    if (savedClientId) {
+        const el = document.getElementById('cfg-drive-client-id');
+        if (el) el.value = savedClientId;
+    }
+    gmActualizarBotonesDrive();
+
+    // ── Cierre seguro ────────────────────────────────────────────────────
+    window.addEventListener('beforeunload', () => { gmHacerSnapshot(false); });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') gmHacerSnapshot(false);
     });
 
-    render();
-    setTimeout(gmMostrarVencimientos, 800);
-
-    // Splash: cierre independiente — no depende de async (restaurarCarpetaGuardada)
-    const splash = document.getElementById('splash');
-    // Arrancar barra de progreso con pequeño delay para que la transición CSS dispare
+    // ── Splash ───────────────────────────────────────────────────────────
     setTimeout(() => {
         const bar = document.getElementById('splash-bar');
         if (bar) bar.style.width = '100%';
     }, 50);
     setTimeout(() => {
-        requestAnimationFrame(() => requestAnimationFrame(() => {
+        const splash = document.getElementById('splash');
+        if (splash) {
             splash.classList.add('fade-out');
             setTimeout(() => splash.remove(), 320);
-        }));
-    }, 5000);
+        }
+    }, 2000);
 
-    // Restaurar carpeta DESPUÉS de cerrar splash para no interferir
-    setTimeout(() => restaurarCarpetaGuardada(), 5100);
+    // ── Carpeta backup ───────────────────────────────────────────────────
+    setTimeout(() => restaurarCarpetaGuardada(), 2200);
 
-    // Versión dinámica en header
-    const hdrV = document.getElementById('hdr-version');
-    if(hdrV) hdrV.textContent = APP_VERSION;
-
-    // Drive: cargar Client ID guardado y mostrar botones si existe
-    const savedClientId = gmGetClientId();
-    if(savedClientId) {
-        const el = document.getElementById('cfg-drive-client-id');
-        if(el) el.value = savedClientId;
-    }
-    gmActualizarBotonesDrive();
-
-    // Cierre seguro: snapshot local al cerrar con X
-    window.addEventListener('beforeunload', () => { gmHacerSnapshot(false); });
-    document.addEventListener('visibilitychange', () => {
-        if(document.visibilityState === 'hidden') gmHacerSnapshot(false);
-    });
+    // ── Vencimientos (después del splash) ────────────────────────────────
+    setTimeout(() => v2RenderVencWidget(), 2500);
 });
 </script>
 <script>
