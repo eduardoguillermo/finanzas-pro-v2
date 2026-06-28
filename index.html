@@ -47,8 +47,8 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 .hkpi-val{font-size:14px;font-weight:700;}
 
 /* ── SCREENS ── */
-#screens{flex:1;overflow:hidden;position:relative;}
-.screen{position:absolute;inset:0;overflow-y:auto;padding:12px 12px 0;display:none;flex-direction:column;gap:10px;padding-bottom:calc(var(--nav-h) + 12px);}
+#screens{flex:1;overflow:hidden;min-width:0;display:flex;flex-direction:column;}
+.screen{display:none;flex-direction:column;gap:10px;overflow-y:auto;width:100%;flex:1;padding:12px;box-sizing:border-box;}
 .screen.active{display:flex;}
 
 /* ── DESKTOP LAYOUT ── */
@@ -498,7 +498,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 // ═══════════════════════════════════════════════════════════════
 //  NAVEGACIÓN v2
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '2.03';
+const APP_VERSION = '2.04';
 
 function v2NavTo(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
