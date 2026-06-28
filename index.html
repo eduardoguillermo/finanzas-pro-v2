@@ -303,19 +303,25 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
   <div id="app-body">
     <nav id="bottom-nav">
     <button class="nav-btn active" data-screen="inicio" onclick="v2NavTo('inicio')">
-      <span class="nav-icon">🏠</span>Inicio
+      <span class="nav-icon">🏠</span><span>Inicio</span>
     </button>
     <button class="nav-btn" data-screen="diario" onclick="v2NavTo('diario')">
-      <span class="nav-icon">📊</span>Diario
+      <span class="nav-icon">📒</span><span>Diario</span>
     </button>
     <button class="nav-btn nav-main" data-screen="registrar" onclick="v2NavTo('registrar')">
       <span class="nav-icon">+</span>
     </button>
     <button class="nav-btn" data-screen="fijos" onclick="v2NavTo('fijos')">
-      <span class="nav-icon">📋</span>Fijos
+      <span class="nav-icon">📋</span><span>Fijos</span>
+    </button>
+    <button class="nav-btn" data-screen="reportes" onclick="v2NavTo('reportes')">
+      <span class="nav-icon">📊</span><span>Reportes</span>
+    </button>
+    <button class="nav-btn" data-screen="ahorros" onclick="v2NavTo('ahorros')">
+      <span class="nav-icon">💰</span><span>Ahorros</span>
     </button>
     <button class="nav-btn" data-screen="config" onclick="v2NavTo('config')">
-      <span class="nav-icon">⚙️</span>Config
+      <span class="nav-icon">⚙️</span><span>Config</span>
     </button>
   </nav>
     <div id="main-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;">
@@ -625,21 +631,57 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
         </div>
       </div>
 
-      <!-- CONFIG -->
-      <div id="screen-config" class="screen">
+      <!-- REPORTES -->
+      <div id="screen-reportes" class="screen">
         <div class="card">
           <div class="card-header"><span class="card-title">📊 Reportes</span></div>
           <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button class="btn btn-ghost" onclick="gmAbrirHistorial()">📅 Historial</button>
-            <button class="btn btn-ghost" onclick="gmAbrirTortas()">🥧 Tortas</button>
+            <button class="btn btn-primary" onclick="gmAbrirHistorial()">📅 Historial mensual</button>
+            <button class="btn btn-primary" onclick="gmAbrirTortas()">🥧 Tortas por rubro</button>
             <button class="btn btn-ghost" onclick="gmMostrarSnapshots()">💾 Snapshots</button>
           </div>
         </div>
+        <div>
+          <div class="section-title"><span>🏆 Top gastos del mes</span></div>
+          <div class="card"><div class="card-body" id="reportes-top5"></div></div>
+        </div>
+        <div>
+          <div class="section-title"><span>📈 Saldos por cuenta</span></div>
+          <div class="card"><div class="card-body" id="reportes-saldos"></div></div>
+        </div>
+      </div>
+
+      <!-- AHORROS -->
+      <div id="screen-ahorros" class="screen">
+        <div id="ahorros-tarjetas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;"></div>
         <div class="card">
-          <div class="card-header"><span class="card-title">💰 Ahorros</span>
-            <button class="btn btn-sm btn-ghost" onclick="gmAbrirAhorros()">Abrir →</button>
+          <div class="card-header"><span class="card-title">➕ Nuevo movimiento</span></div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group"><label>Subrubro</label><select id="ah-subrubro"></select></div>
+              <div class="form-group"><label>Tipo</label>
+                <select id="ah-tipo"><option value="ingreso">⬆️ Ingreso</option><option value="retiro">⬇️ Retiro</option></select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Monto ($)</label><input id="ah-monto" type="number" min="0" step="any" placeholder="0"></div>
+              <div class="form-group"><label>Fecha</label><input id="ah-fecha" type="date"></div>
+            </div>
+            <div class="form-group"><label>Concepto</label><input id="ah-concepto" type="text" placeholder="Opcional"></div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary" style="flex:1;" id="btn-guardar-ahorro-screen">✓ Guardar</button>
+              <button class="btn btn-ghost" onclick="gmAbrirSubrubros()">⚙️ Subrubros</button>
+            </div>
           </div>
         </div>
+        <div>
+          <div class="section-title"><span>📋 Historial de ahorros</span></div>
+          <div class="card"><div id="screen-ahorros-historial"></div></div>
+        </div>
+      </div>
+
+      <!-- CONFIG -->
+      <div id="screen-config" class="screen">
         <div class="card">
           <div class="card-header"><span class="card-title">☁️ Drive & Backup</span></div>
           <div class="card-body">
@@ -700,7 +742,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
 // ═══════════════════════════════════════════════════════════════
 //  NAVEGACIÓN v2
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '2.08';
+const APP_VERSION = '2.09';
 
 function v2NavTo(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -713,6 +755,8 @@ function v2NavTo(screenId) {
     if (screenId === 'inicio')    v2RenderInicio();
     if (screenId === 'diario')    { initTabs(); initMesesVisor(); render(); actualizarRubrosRapidos(); }
     if (screenId === 'fijos')     v2RenderFijosV2();
+    if (screenId === 'reportes')  v2RenderReportes();
+    if (screenId === 'ahorros')   v2RenderAhorrosScreen();
     if (screenId === 'config')    v2RenderConfig();
     if (screenId === 'registrar') v2PrepararForm();
 }
@@ -728,6 +772,93 @@ function v2SegClick(btn) {
 // ═══════════════════════════════════════════════════════════════
 //  RENDER INICIO
 // ═══════════════════════════════════════════════════════════════
+
+function v2RenderReportes() {
+    renderTop5Rubros();
+    const src  = document.getElementById('top5-rubros');
+    const dest = document.getElementById('reportes-top5');
+    if (src && dest) dest.innerHTML = src.innerHTML;
+    const m = calcularMetricas();
+    const cuentas = getCuentas();
+    const el = document.getElementById('reportes-saldos');
+    if (el) el.innerHTML = cuentas.map(c => {
+        const sal = m.saldos[c.key] || 0;
+        const color = sal >= 0 ? 'var(--ingreso)' : 'var(--gasto)';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">'
+            + '<span style="font-size:14px;font-weight:600;">' + c.icon + ' ' + c.label + '</span>'
+            + '<span style="font-size:16px;font-weight:800;color:' + color + ';">' + fmt(sal) + '</span>'
+            + '</div>';
+    }).join('');
+}
+
+function v2RenderAhorrosScreen() {
+    const saldos = gmSaldosPorSubrubro();
+    const total  = Object.values(saldos).reduce((a,v) => a+v, 0);
+    const grid = document.getElementById('ahorros-tarjetas');
+    if (grid) {
+        grid.innerHTML = DB.ahorros.subrubros.map(s => {
+            const sal = saldos[s.id] || 0;
+            return '<div class="kpi"><div class="kpi-label">' + s.nombre + '</div>'
+                + '<div class="kpi-val" style="color:' + (sal>=0?'var(--ingreso)':'var(--gasto)') + ';">' + fmt(sal) + '</div></div>';
+        }).join('') + '<div class="kpi"><div class="kpi-label">Total</div>'
+            + '<div class="kpi-val" style="color:var(--primary);">' + fmt(total) + '</div></div>';
+    }
+    const sel = document.getElementById('ah-subrubro');
+    if (sel) sel.innerHTML = DB.ahorros.subrubros.map(s =>
+        '<option value="' + s.id + '">' + s.nombre + '</option>').join('');
+    const fechaEl = document.getElementById('ah-fecha');
+    if (fechaEl && !fechaEl.value) fechaEl.value = hoyISO();
+    const btnG = document.getElementById('btn-guardar-ahorro-screen');
+    if (btnG && !btnG._bound) {
+        btnG._bound = true;
+        btnG.addEventListener('click', function() {
+            const subrubroId = parseInt(document.getElementById('ah-subrubro').value);
+            const tipo       = document.getElementById('ah-tipo').value;
+            const monto      = parseFloat(document.getElementById('ah-monto').value);
+            const concepto   = document.getElementById('ah-concepto').value.trim();
+            const fecha      = document.getElementById('ah-fecha').value || hoyISO();
+            if (isNaN(monto) || monto <= 0) { toast('Ingresá un monto válido.', 'error'); return; }
+            DB.ahorros.movimientos.push({ id: DB.ahorros.nid++, subrubroId, tipo, monto, concepto, fecha });
+            save();
+            document.getElementById('ah-monto').value = '';
+            document.getElementById('ah-concepto').value = '';
+            toast('✅ Ahorro guardado', 'success');
+            v2RenderAhorrosScreen();
+        });
+    }
+    const hist = document.getElementById('screen-ahorros-historial');
+    if (!hist) return;
+    const movs = DB.ahorros.movimientos.slice().sort((a,b) => b.fecha > a.fecha ? 1 : -1);
+    if (!movs.length) { hist.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>Sin movimientos</p></div>'; return; }
+    hist.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+        + '<thead><tr style="border-bottom:2px solid var(--border);background:var(--bg-subtle);">'
+        + '<th style="padding:8px;text-align:left;color:var(--text-muted);">Fecha</th>'
+        + '<th style="padding:8px;text-align:left;color:var(--text-muted);">Subrubro</th>'
+        + '<th style="padding:8px;text-align:left;color:var(--text-muted);">Concepto</th>'
+        + '<th style="padding:8px;text-align:right;color:var(--ingreso);">Ingreso</th>'
+        + '<th style="padding:8px;text-align:right;color:var(--gasto);">Retiro</th>'
+        + '<th></th></tr></thead><tbody>'
+        + movs.map(m => {
+            const sub = DB.ahorros.subrubros.find(s => s.id === m.subrubroId);
+            const esI = m.tipo === 'ingreso';
+            return '<tr style="border-bottom:1px solid var(--border);">'
+                + '<td style="padding:8px;color:var(--text-muted);font-size:11px;">' + m.fecha + '</td>'
+                + '<td style="padding:8px;font-weight:600;">' + (sub?sub.nombre:'-') + '</td>'
+                + '<td style="padding:8px;color:var(--text-muted);">' + (m.concepto||'-') + '</td>'
+                + '<td style="padding:8px;text-align:right;color:var(--ingreso);font-weight:700;">' + (esI?fmt(m.monto):'') + '</td>'
+                + '<td style="padding:8px;text-align:right;color:var(--gasto);font-weight:700;">' + (!esI?fmt(m.monto):'') + '</td>'
+                + '<td style="padding:8px;text-align:center;"><button data-del-ah="' + m.id + '" style="background:none;border:1px solid var(--gasto);border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;color:var(--gasto);">✕</button></td></tr>';
+        }).join('') + '</tbody></table>';
+    hist.querySelectorAll('[data-del-ah]').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const ok = await showConfirm('Eliminar', '¿Eliminar este movimiento?');
+            if (!ok) return;
+            DB.ahorros.movimientos = DB.ahorros.movimientos.filter(m => m.id !== parseInt(btn.dataset.delAh));
+            save(); v2RenderAhorrosScreen();
+        });
+    });
+}
+
 function v2RenderInicio() {
     const m = calcularMetricas();
     const mesActual = hoyISO().slice(0,7);
