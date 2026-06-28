@@ -29,8 +29,7 @@
 html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;}
 
 /* ── LAYOUT ── */
-#app{display:flex;flex-direction:column;height:100%;max-width:480px;margin:0 auto;position:relative;}
-@media(min-width:900px){#app{max-width:900px;}}
+#app{display:flex;flex-direction:column;height:100%;width:100%;position:relative;}
 
 /* ── HEADER ── */
 #app-header{
@@ -51,6 +50,27 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 #screens{flex:1;overflow:hidden;position:relative;}
 .screen{position:absolute;inset:0;overflow-y:auto;padding:12px 12px 0;display:none;flex-direction:column;gap:10px;padding-bottom:calc(var(--nav-h) + 12px);}
 .screen.active{display:flex;}
+
+/* ── DESKTOP LAYOUT ── */
+@media(min-width:768px){
+  #app{flex-direction:row;flex-wrap:wrap;}
+  #app-header{width:100%;flex-shrink:0;height:50px;}
+  #screens{flex:1;min-width:0;}
+  #bottom-nav{width:72px;height:auto;flex-direction:column;border-top:none;border-right:1px solid var(--border);order:-1;padding:16px 0;}
+  .nav-btn{height:64px;flex:none;width:100%;flex-direction:column;border-radius:0;}
+  .nav-btn.active::after{top:0;bottom:0;left:auto;right:0;width:3px;height:auto;border-radius:2px 0 0 2px;}
+  .nav-btn.nav-main{width:52px;height:52px;border-radius:50%;margin:8px auto;}
+  .screen{padding-bottom:12px;}
+  .kpi-grid{grid-template-columns:repeat(4,1fr);}
+}
+@media(min-width:1100px){
+  #bottom-nav{width:200px;padding:16px 8px;}
+  .nav-btn{flex-direction:row;justify-content:flex-start;gap:12px;padding:0 16px;font-size:13px;border-radius:8px;margin:2px 8px;width:auto;}
+  .nav-btn .nav-icon{font-size:18px;}
+  .nav-btn.active::after{top:0;bottom:0;left:0;right:0;width:100%;height:100%;background:var(--primary-light);border-radius:8px;z-index:-1;}
+  .nav-btn.nav-main{width:52px;height:52px;border-radius:50%;margin:8px auto;flex-direction:column;}
+  .kpi-grid{grid-template-columns:repeat(5,1fr);}
+}
 
 /* ── BOTTOM NAV ── */
 #bottom-nav{
@@ -249,7 +269,9 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
       <div class="kpi-grid">
         <div class="kpi"><div class="kpi-label">Ingresos</div><div class="kpi-val" id="kpi-ingresos" style="color:var(--ingreso)">$0</div></div>
         <div class="kpi"><div class="kpi-label">Gastos</div><div class="kpi-val" id="kpi-gastos" style="color:var(--gasto)">$0</div></div>
-        <div class="kpi"><div class="kpi-label">Balance</div><div class="kpi-val" id="kpi-balance">$0</div></div>
+        <div class="kpi"><div class="kpi-label">Balance mes</div><div class="kpi-val" id="kpi-balance">$0</div></div>
+        <div class="kpi"><div class="kpi-label">Efectivo</div><div class="kpi-val" id="kpi-efectivo" style="color:var(--primary)">$0</div></div>
+        <div class="kpi"><div class="kpi-label" id="kpi-label-banco1">Banco 1</div><div class="kpi-val" id="kpi-banco1" style="color:var(--primary)">$0</div></div>
       </div>
       <!-- Vencimientos widget (solo si hay) -->
       <div id="venc-widget-wrap" style="display:none;">
@@ -476,7 +498,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 // ═══════════════════════════════════════════════════════════════
 //  NAVEGACIÓN v2
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '2.01'; // cache-bust 20260628013950
+const APP_VERSION = '2.02';
 
 function v2NavTo(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -517,8 +539,16 @@ function v2RenderInicio() {
     kpiBal.textContent = fmt(balance);
     kpiBal.style.color = balance >= 0 ? 'var(--ingreso)' : 'var(--gasto)';
 
+    // Saldos de cuentas
+    const kpiEf = document.getElementById('kpi-efectivo');
+    const kpiB1 = document.getElementById('kpi-banco1');
+    const kpiLB1 = document.getElementById('kpi-label-banco1');
+    if (kpiEf) kpiEf.textContent = fmt(m.saldos.efectivo || 0);
+    if (kpiB1) kpiB1.textContent = fmt(m.saldos.debito1 || 0);
+    if (kpiLB1) kpiLB1.textContent = DB.cuentas.debito1 || 'Banco 1';
     // Header
-    document.getElementById('hdr-balance').textContent = fmt(Object.values(m.saldos).reduce((a,v)=>a+v,0));
+    const balTotal = Object.values(m.saldos).reduce((a,v)=>a+v,0);
+    document.getElementById('hdr-balance').textContent = fmt(balTotal);
     document.getElementById('hdr-mes').textContent = fmt(balance);
 
     // Vencimientos widget
