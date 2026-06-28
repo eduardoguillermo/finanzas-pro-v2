@@ -29,7 +29,7 @@
 html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;}
 
 /* ── LAYOUT ── */
-#app{display:flex;flex-direction:column;height:100%;width:100%;position:relative;}
+#app{display:flex;flex-direction:column;height:100%;width:100%;}
 
 /* ── HEADER ── */
 #app-header{
@@ -47,28 +47,49 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 .hkpi-val{font-size:14px;font-weight:700;}
 
 /* ── SCREENS ── */
-#screens{flex:1;overflow:hidden;min-width:0;display:flex;flex-direction:column;}
+#screens{flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0;}
 .screen{display:none;flex-direction:column;gap:10px;overflow-y:auto;width:100%;flex:1;padding:12px;box-sizing:border-box;}
 .screen.active{display:flex;}
 
+/* ── APP BODY ── */
+#app-body{flex:1;display:flex;overflow:hidden;}
+
 /* ── DESKTOP LAYOUT ── */
 @media(min-width:768px){
-  #app{flex-direction:row;flex-wrap:wrap;}
-  #app-header{width:100%;flex-shrink:0;height:50px;}
-  #screens{flex:1;min-width:0;}
-  #bottom-nav{width:72px;height:auto;flex-direction:column;border-top:none;border-right:1px solid var(--border);order:-1;padding:16px 0;}
-  .nav-btn{height:64px;flex:none;width:100%;flex-direction:column;border-radius:0;}
-  .nav-btn.active::after{top:0;bottom:0;left:auto;right:0;width:3px;height:auto;border-radius:2px 0 0 2px;}
-  .nav-btn.nav-main{width:52px;height:52px;border-radius:50%;margin:8px auto;}
-  .screen{padding-bottom:12px;}
+  /* App: header arriba, body abajo (flex column) — el body es flex row */
+  #app-header{height:50px;}
+  #bottom-nav{
+    width:68px;height:100%;flex-direction:column;
+    border-top:none;border-right:1px solid var(--border);
+    position:static;box-shadow:none;flex-shrink:0;
+    padding:12px 0;
+  }
+  .nav-btn{
+    height:60px;width:100%;flex:none;
+    flex-direction:column;border-radius:8px;
+    margin:2px 4px;width:calc(100% - 8px);
+  }
+  .nav-btn.active::after{
+    top:10%;bottom:10%;right:0;left:auto;
+    width:3px;height:80%;border-radius:2px 0 0 2px;
+  }
+  .nav-btn.nav-main{width:48px;height:48px;border-radius:50%;margin:8px auto;}
   .kpi-grid{grid-template-columns:repeat(4,1fr);}
 }
 @media(min-width:1100px){
-  #bottom-nav{width:200px;padding:16px 8px;}
-  .nav-btn{flex-direction:row;justify-content:flex-start;gap:12px;padding:0 16px;font-size:13px;border-radius:8px;margin:2px 8px;width:auto;}
-  .nav-btn .nav-icon{font-size:18px;}
-  .nav-btn.active::after{top:0;bottom:0;left:0;right:0;width:100%;height:100%;background:var(--primary-light);border-radius:8px;z-index:-1;}
-  .nav-btn.nav-main{width:52px;height:52px;border-radius:50%;margin:8px auto;flex-direction:column;}
+  #bottom-nav{width:180px;padding:16px 8px;}
+  .nav-btn{
+    flex-direction:row;justify-content:flex-start;
+    gap:12px;padding:0 14px;font-size:13px;height:44px;
+  }
+  .nav-btn .nav-icon{font-size:18px;width:22px;text-align:center;}
+  .nav-btn.active{background:var(--primary-light);color:var(--primary);}
+  .nav-btn.active::after{display:none;}
+  .nav-btn.nav-main{
+    width:48px;height:48px;border-radius:50%;
+    flex-direction:column;justify-content:center;
+    margin:8px auto;padding:0;
+  }
   .kpi-grid{grid-template-columns:repeat(5,1fr);}
 }
 
@@ -260,7 +281,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
     </div>
   </header>
 
-  <div id="app-body" style="flex:1;display:flex;overflow:hidden;min-width:0;">
+  <div id="app-body">
   <!-- BOTTOM NAV -->
   <nav id="bottom-nav">
     <button class="nav-btn active" data-screen="inicio" onclick="v2NavTo('inicio')">
@@ -498,7 +519,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 // ═══════════════════════════════════════════════════════════════
 //  NAVEGACIÓN v2
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '2.04';
+const APP_VERSION = '2.05';
 
 function v2NavTo(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
