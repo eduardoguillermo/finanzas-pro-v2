@@ -238,7 +238,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 
 <div id="splash">
   <h1>Finanzas<span>Pro</span></h1>
-  <p id="splash-sub">Ledger Edition v2</p>
+  <p id="splash-sub">Ledger Edition</p>
   <div id="splash-dev">Development by Guille</div>
   <div id="splash-bar-wrap"><div id="splash-bar"></div></div>
 </div>
@@ -247,7 +247,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 
   <!-- HEADER -->
   <header id="app-header">
-    <h1>Finanzas<span>Pro</span></h1>
+    <h1>Finanzas<span>Pro</span> <span id="hdr-version" style="font-size:11px;font-weight:400;opacity:.6;"></span></h1>
     <div id="header-kpi">
       <div class="hkpi">
         <div class="hkpi-label">Balance</div>
@@ -3339,6 +3339,10 @@ addEventListener('DOMContentLoaded', function() {
     });
 
     // ── Splash ───────────────────────────────────────────────────────────
+    const splashSub = document.getElementById('splash-sub');
+    if (splashSub) splashSub.textContent = 'Ledger Edition v' + APP_VERSION;
+    const hdrVer = document.getElementById('hdr-version');
+    if (hdrVer) hdrVer.textContent = 'v' + APP_VERSION;
     setTimeout(() => {
         const bar = document.getElementById('splash-bar');
         if (bar) bar.style.width = '100%';
