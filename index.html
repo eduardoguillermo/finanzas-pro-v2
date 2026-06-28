@@ -260,6 +260,25 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
     </div>
   </header>
 
+  <div id="app-body" style="flex:1;display:flex;overflow:hidden;min-width:0;">
+  <!-- BOTTOM NAV -->
+  <nav id="bottom-nav">
+    <button class="nav-btn active" data-screen="inicio" onclick="v2NavTo('inicio')">
+      <span class="nav-icon">🏠</span>Inicio
+    </button>
+    <button class="nav-btn" data-screen="diario" onclick="v2NavTo('diario')">
+      <span class="nav-icon">📊</span>Diario
+    </button>
+    <button class="nav-btn nav-main" data-screen="registrar" onclick="v2NavTo('registrar')">
+      <span class="nav-icon">+</span>
+    </button>
+    <button class="nav-btn" data-screen="fijos" onclick="v2NavTo('fijos')">
+      <span class="nav-icon">📋</span>Fijos
+    </button>
+    <button class="nav-btn" data-screen="config" onclick="v2NavTo('config')">
+      <span class="nav-icon">⚙️</span>Config
+    </button>
+  </nav>
   <!-- SCREENS -->
   <div id="screens">
 
@@ -454,26 +473,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
     </div>
 
   </div><!-- /screens -->
-
-  <!-- BOTTOM NAV -->
-  <nav id="bottom-nav">
-    <button class="nav-btn active" data-screen="inicio" onclick="v2NavTo('inicio')">
-      <span class="nav-icon">🏠</span>Inicio
-    </button>
-    <button class="nav-btn" data-screen="diario" onclick="v2NavTo('diario')">
-      <span class="nav-icon">📊</span>Diario
-    </button>
-    <button class="nav-btn nav-main" data-screen="registrar" onclick="v2NavTo('registrar')">
-      <span class="nav-icon">+</span>
-    </button>
-    <button class="nav-btn" data-screen="fijos" onclick="v2NavTo('fijos')">
-      <span class="nav-icon">📋</span>Fijos
-    </button>
-    <button class="nav-btn" data-screen="config" onclick="v2NavTo('config')">
-      <span class="nav-icon">⚙️</span>Config
-    </button>
-  </nav>
-
+  </div><!-- /app-body -->
 </div><!-- /app -->
 
 <!-- CONFIRM MODAL (reutilizado del sistema original) -->
@@ -498,7 +498,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);font-fami
 // ═══════════════════════════════════════════════════════════════
 //  NAVEGACIÓN v2
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '2.02';
+const APP_VERSION = '2.03';
 
 function v2NavTo(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
