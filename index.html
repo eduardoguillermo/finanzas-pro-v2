@@ -677,15 +677,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
   </div>
 </div>
 
-<!-- SPLASH -->
-<div id="splash">
-    <div class="splash-logo">Finanzas<span>Pro</span></div>
-    <div class="splash-version">v13.56 · Ledger Edition</div>
-    <div style="position:absolute;bottom:18%;right:8%;font-family:'Dancing Script',cursive;font-size:32px;color:#93c5fd;pointer-events:none">Development by Guille</div>
-    <div class="splash-progress-track">
-        <div class="splash-progress-bar" id="splash-bar"></div>
-    </div>
-</div>
+
 
 <!-- TOASTS -->
 <div id="toast-container"></div>
@@ -708,7 +700,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
 // ═══════════════════════════════════════════════════════════════
 //  NAVEGACIÓN v2
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '2.07';
+const APP_VERSION = '2.08';
 
 function v2NavTo(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -718,11 +710,11 @@ function v2NavTo(screenId) {
     const btn = document.querySelector('[data-screen="' + screenId + '"]');
     if (btn) btn.classList.add('active');
     // Render por pantalla
-    if (screenId === 'inicio')     v2RenderInicio();
-    if (screenId === 'diario')     v2RenderDiario();
-    if (screenId === 'fijos')      v2RenderFijosV2();
-    if (screenId === 'config')     v2RenderConfig();
-    if (screenId === 'registrar')  v2PrepararForm();
+    if (screenId === 'inicio')    v2RenderInicio();
+    if (screenId === 'diario')    { initTabs(); initMesesVisor(); render(); actualizarRubrosRapidos(); }
+    if (screenId === 'fijos')     v2RenderFijosV2();
+    if (screenId === 'config')    v2RenderConfig();
+    if (screenId === 'registrar') v2PrepararForm();
 }
 
 function v2SegClick(btn) {
@@ -1036,18 +1028,36 @@ function v2AbrirHistorial() { gmAbrirHistorial(); }
 //  OVERRIDE: post-save render
 // ═══════════════════════════════════════════════════════════════
 function render() {
-    // En v2 el render actualiza la pantalla activa
+    // Actualizar KPIs del header siempre
+    try {
+        const m = calcularMetricas();
+        const bal = Object.values(m.saldos).reduce((a,v)=>a+v,0);
+        const mesActual = hoyISO().slice(0,7);
+        const mesDatos = m.mapaMensual[mesActual] || {ingresos:0, gastos:0};
+        const elBal = document.getElementById('hdr-balance');
+        const elMes = document.getElementById('hdr-mes');
+        if (elBal) elBal.textContent = fmt(bal);
+        if (elMes) elMes.textContent = fmt(mesDatos.ingresos - mesDatos.gastos);
+    } catch(e) {}
+    // Render por pantalla activa
     const active = document.querySelector('.screen.active');
     if (!active) return;
-    const id = active.id.replace('screen-','');
+    const id = active.id.replace('screen-', '');
     if (id === 'inicio')  v2RenderInicio();
-    if (id === 'diario')  v2RenderDiario();
+    if (id === 'diario')  { renderLibroDiario(); }
     if (id === 'fijos')   v2RenderFijosV2();
     if (id === 'config')  v2RenderConfig();
-    // Actualizar header KPIs siempre
-    const m = calcularMetricas();
-    const bal = Object.values(m.saldos).reduce((a,v)=>a+v,0);
-    document.getElementById('hdr-balance').textContent = fmt(bal);
+}
+
+// Render del libro diario v1 (llama las funciones internas de v1)
+function renderLibroDiario() {
+    try {
+        actualizarRubrosRapidos();
+        renderListaMovimientos();
+        renderReporteMensual();
+        renderTop5Rubros();
+        renderBalanceHeader();
+    } catch(e) { console.warn('renderLibroDiario:', e); }
 }
 
 // Render de rubros para Config (override)
@@ -3195,232 +3205,7 @@ function calcularMetricas() {
 // ════════════════════════════════════════════════════
 //  RENDER
 // ════════════════════════════════════════════════════
-function render() {
-    const metricas     = calcularMetricas();
-    const claveMesVisor= document.getElementById('rubro-mes-visor').value;
-    const cuentas      = getCuentas();
 
-    // ── Header: métricas ──
-    const balTotal = metricas.tIngresos - metricas.tGastos;
-    setValColor('view-balance',       fmt(balTotal),                balTotal >= 0);
-    setValColor('view-bal-efectivo',  fmt(metricas.saldos.efectivo), metricas.saldos.efectivo >= 0);
-    setValColor('view-bal-debito1',   fmt(metricas.saldos.debito1),  metricas.saldos.debito1 >= 0);
-    setValColor('view-bal-debito2',   fmt(metricas.saldos.debito2),  metricas.saldos.debito2 >= 0);
-    setValColor('view-bal-debito3',   fmt(metricas.saldos.debito3),  metricas.saldos.debito3 >= 0);
-    document.getElementById('label-hdr-debito1').textContent = DB.cuentas.debito1;
-    document.getElementById('label-hdr-debito2').textContent = DB.cuentas.debito2;
-    document.getElementById('label-hdr-debito3').textContent = DB.cuentas.debito3 || '';
-    // Sincronizar campos de texto con DB para que no se pierdan al hacer render()
-    document.getElementById('cfg-debito1').value = DB.cuentas.debito1;
-    document.getElementById('cfg-debito2').value = DB.cuentas.debito2;
-    document.getElementById('cfg-debito3').value = DB.cuentas.debito3 || '';
-    // Ocultar cuenta3 si está vacía
-    const hasDeb3 = !!DB.cuentas.debito3;
-    document.getElementById('grp-debito3').style.display = hasDeb3 ? '' : 'none';
-    document.getElementById('sep-d2').style.display = hasDeb3 ? '' : 'none';
-
-    // ── Header mes actual ──
-    let presupTotal = 0;
-    const claveMesActual = obtenerClaveMesActual();
-    DB.rubros.filter(r => r.tipo === 'gasto').forEach(r => {
-        presupTotal += getLimiteHistorico(claveMesActual, r.id);
-    });
-    const gastosMesActual   = metricas.mapaMensual[claveMesActual]?.gastos   || 0;
-    const ingresosMesActual = metricas.mapaMensual[claveMesActual]?.ingresos || 0;
-    const restante          = presupTotal - gastosMesActual;
-    document.getElementById('view-mes-ingresos').textContent = fmt(ingresosMesActual);
-    document.getElementById('view-mes-gastos').textContent   = fmt(gastosMesActual);
-    document.getElementById('view-budget-general').textContent = fmt(presupTotal);
-    document.getElementById('view-budget-general').style.color = gastosMesActual > presupTotal ? 'var(--gasto)' : 'var(--primary)';
-    setValColor('view-budget-restante', fmt(restante), restante >= 0);
-
-    // ── Selects de cuentas ──
-    const optsHTML = cuentas.map(c => `<option value="${c.key}">${c.icon} ${c.label}</option>`).join('');
-    ['mov-origen','mov-transf-origen','mov-transf-destino'].forEach(id => {
-        const prev = document.getElementById(id).value;
-        document.getElementById(id).innerHTML = optsHTML;
-        if (prev) document.getElementById(id).value = prev;
-    });
-
-    // ── Select filtro avanzado ──
-    const filtroEl   = document.getElementById('filtro-avanzado');
-    const prevFiltro = filtroEl.value || 'all';
-    const rubrosGasto   = [...DB.rubros].filter(r => r.tipo === 'gasto').sort((a,b) => a.nombre.localeCompare(b.nombre));
-    const rubrosIngreso = [...DB.rubros].filter(r => r.tipo === 'ingreso').sort((a,b) => a.nombre.localeCompare(b.nombre));
-    filtroEl.innerHTML = `
-        <option value="all">🔍 Todos</option>
-        <option value="gasto">🔻 Gastos</option>
-        <option value="ingreso">🔺 Ingresos</option>
-        <option value="transferencia">⇅ Transferencias</option>
-        ${rubrosGasto.length   ? `<optgroup label="── Rubros gasto">${rubrosGasto.map(r   => `<option value="r-${r.id}">📁 ${r.nombre}</option>`).join('')}</optgroup>` : ''}
-        ${rubrosIngreso.length ? `<optgroup label="── Rubros ingreso">${rubrosIngreso.map(r => `<option value="r-${r.id}">📁 ${r.nombre}</option>`).join('')}</optgroup>` : ''}
-        <optgroup label="── Cuentas">${cuentas.map(c => `<option value="f-${c.key}">${c.icon} ${c.label}</option>`).join('')}</optgroup>
-    `;
-    filtroEl.value = prevFiltro;
-
-    // ── Select rubros en formulario ──
-    const rubroEl = document.getElementById('mov-rubro');
-    const prevRub = rubroEl.value;
-    const rubOrd  = [...DB.rubros].sort((a, b) => a.nombre.localeCompare(b.nombre));
-    rubroEl.innerHTML = rubOrd.map(r => `<option value="${r.id}">${r.nombre} (${r.tipo === 'gasto' ? 'G' : 'I'})</option>`).join('');
-    if (prevRub) rubroEl.value = prevRub;
-
-    // ── Lista rubros ──
-    const listaRubros = document.getElementById('lista-rubros');
-    listaRubros.innerHTML = '';
-    if (rubOrd.length === 0) {
-        listaRubros.innerHTML = emptyState('📁', 'Sin categorías. Agregá una arriba.');
-    } else {
-        rubOrd.forEach(r => {
-            const lim = getLimiteHistorico(claveMesVisor, r.id);
-            const txtLim = lim > 0 ? `<span style="color:var(--text-muted); font-size:10px; font-weight:600;"> · ${fmt(lim)}</span>` : (r.tipo === 'gasto' ? `<span style="color:var(--text-muted); font-size:10px;"> · sin límite</span>` : '');
-            const div = document.createElement('div');
-            div.className = 'rub-row';
-            div.innerHTML = `
-                <span><strong style="font-size:12px;">${r.nombre}</strong><span class="badge ${r.tipo}" style="margin-left:4px;">${r.tipo === 'gasto' ? 'G' : 'I'}</span>${txtLim}</span>
-                <div style="display:flex; gap:2px;">
-                    <button class="btn-icon" data-edit="${r.id}" title="Editar">✏️</button>
-                    <button class="btn-icon danger" data-del="${r.id}" title="Eliminar">🗑️</button>
-                </div>`;
-            div.querySelector('[data-edit]').addEventListener('click', () => editarRubro(r.id));
-            div.querySelector('[data-del]').addEventListener('click',  () => eliminarRubro(r.id));
-            listaRubros.appendChild(div);
-        });
-    }
-
-    // ── Libro diario ──
-    const filtrados = obtenerFiltrados();
-    const fValorActivo = filtroEl.value || 'all';
-
-    // Suma contadora
-    let suma = 0;
-    filtrados.forEach(m => {
-        const tipo = getTipoMov(m);
-        if (fValorActivo === 'gasto' || fValorActivo === 'ingreso') {
-            suma += m.monto;
-        } else if (fValorActivo.startsWith('r-')) {
-            // filtro por rubro: suma simple de montos
-            if (tipo === 'ingreso') suma += m.monto;
-            else if (tipo === 'gasto') suma -= m.monto;
-        } else if (fValorActivo.startsWith('f-')) {
-            const cuenta = fValorActivo.slice(2);
-            if (tipo === 'transferencia') {
-                if (m.origen === cuenta)  suma -= m.monto;
-                if (m.destino === cuenta) suma += m.monto;
-            } else {
-                if (m.origen === cuenta) suma += tipo === 'ingreso' ? m.monto : -m.monto;
-            }
-        } else {
-            if (tipo === 'ingreso')     suma += m.monto;
-            else if (tipo === 'gasto')  suma -= m.monto;
-        }
-    });
-
-    const totalEl = document.getElementById('live-total-unico');
-    totalEl.textContent = fmt(Math.abs(suma));
-    totalEl.style.color = fValorActivo === 'gasto' ? 'var(--gasto)' : fValorActivo === 'ingreso' ? 'var(--ingreso)' : suma >= 0 ? 'var(--ingreso)' : 'var(--gasto)';
-    document.getElementById('live-count-label').textContent = `${filtrados.length} asiento${filtrados.length !== 1 ? 's' : ''}`;
-
-    const listaMov = document.getElementById('lista-movimientos');
-    listaMov.innerHTML = '';
-    if (filtrados.length === 0) {
-        listaMov.innerHTML = emptyState('📋', 'Sin movimientos para los filtros actuales.');
-    } else {
-        [...filtrados].reverse().slice(0, currentLimitMov).forEach(m => {
-            const tipo   = getTipoMov(m);
-            const rubro  = DB.rubros.find(r => r.id === m.rubroId);
-            const nRubro = m.rubroId === 0 ? 'Traspaso' : (rubro?.nombre || 'S/R');
-            const signo  = tipo === 'gasto' ? '-' : tipo === 'ingreso' ? '+' : '⇅';
-            const medio  = tipo === 'transferencia'
-                ? `<span class="badge wallet">${labelCuenta(m.origen).slice(0,6)}→${labelCuenta(m.destino).slice(0,6)}</span>`
-                : `<span class="badge wallet">${labelCuenta(m.origen)}</span>`;
-
-            const div = document.createElement('div');
-            div.className = 'mov-row';
-            div.innerHTML = `
-                <div class="mov-row-left">
-                    <div class="mov-row-concept" title="${m.concepto}">${m.concepto}</div>
-                    <div class="mov-row-meta">
-                        <span class="mov-row-date">${fechaDisplay(m.fecha)}</span>
-                        <span class="badge ${tipo === 'transferencia' ? 'transf' : tipo}">${nRubro}</span>
-                        ${medio}
-                        ${m.notas ? `<span style="font-size:10px;color:var(--text-muted);font-style:italic;" title="${m.notas}">📝 ${m.notas.length>30?m.notas.slice(0,30)+'…':m.notas}</span>` : ''}
-                    </div>
-                </div>
-                <div class="mov-row-right">
-                    <span class="mov-amount" style="color:var(--${tipo === 'transferencia' ? 'transferencia' : tipo})">${signo}${fmt(m.monto)}</span>
-                    <button class="btn-icon" data-edit-mov="${m.id}" title="Editar">✏️</button>
-                    <button class="btn-icon danger" data-del="${m.id}" title="Eliminar">🗑️</button>
-                </div>`;
-            div.querySelector('[data-del]').addEventListener('click', () => eliminarMovimiento(m.id));
-            div.querySelector('[data-edit-mov]')?.addEventListener('click', () => editarMovimiento(m.id));
-            listaMov.appendChild(div);
-        });
-
-        if (filtrados.length > currentLimitMov) {
-            const btnMas = document.createElement('button');
-            btnMas.className   = 'btn-secondary btn-block';
-            btnMas.style.cssText = 'margin-top:4px; font-size:11px;';
-            btnMas.textContent = `Ver más (${filtrados.length - currentLimitMov} restantes)`;
-            btnMas.onclick = () => { currentLimitMov += ITEMS_PER_PAGE; render(); };
-            listaMov.appendChild(btnMas);
-        }
-    }
-
-    // ── Reporte mensual ──
-    actualizarRubrosRapidos();
-    renderTop5Rubros();
-    const listaReporte = document.getElementById('lista-reporte-mensual');
-    listaReporte.innerHTML = '';
-    const mesesOrdenados = Object.keys(metricas.mapaMensual).sort().reverse();
-    if (mesesOrdenados.length === 0) {
-        listaReporte.innerHTML = emptyState('📈', 'Sin datos de períodos aún.');
-    }
-    mesesOrdenados.forEach(clave => {
-        const datos = metricas.mapaMensual[clave];
-        let htmlBudgets = '';
-        let totalPresup = 0;
-
-        DB.rubros.filter(r => r.tipo === 'gasto').forEach(r => {
-            const lim = getLimiteHistorico(clave, r.id);
-            if (lim > 0) {
-                totalPresup += lim;
-                const gastado = datos.desgloseRubros[r.id] || 0;
-                const pct     = Math.min((gastado / lim) * 100, 100);
-                const color   = pct >= 100 ? 'var(--gasto)' : pct >= 85 ? 'var(--transferencia)' : 'var(--primary)';
-                htmlBudgets += `
-                    <div class="budget-row-report">
-                        <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:700;">
-                            <span style="color:var(--text-label)">${r.nombre}</span>
-                            <span style="color:${pct >= 100 ? 'var(--gasto)' : 'var(--text-main)'}">${fmt(gastado)} / ${fmt(lim)}</span>
-                        </div>
-                        <div class="budget-bar-bg"><div class="budget-bar-fill" style="width:${pct}%; background:${color};"></div></div>
-                    </div>`;
-            }
-        });
-
-        const neto  = datos.ingresos - datos.gastos;
-        const esMes = clave === claveMesActual;
-        const div   = document.createElement('div');
-        div.className = 'month-card';
-        if (esMes) div.style.borderColor = 'var(--primary)';
-        div.innerHTML = `
-            <div class="month-header">
-                <span>${datos.etiqueta}</span>
-                ${esMes ? '<span style="font-size:9px; font-weight:700; color:var(--primary); background:var(--primary-light); padding:1px 5px; border-radius:3px;">MES ACTUAL</span>' : ''}
-            </div>
-            <div class="month-data"><span style="color:var(--text-muted)">Presupuesto total</span><span style="color:var(--primary); font-weight:700;">${fmt(totalPresup)}</span></div>
-            <div class="month-data"><span style="color:var(--text-muted)">Gastos realizados</span><span style="color:var(--gasto); font-weight:700;">−${fmt(datos.gastos)}</span></div>
-            <div class="month-data"><span style="color:var(--text-muted)">Ingresos</span><span style="color:var(--ingreso); font-weight:700;">+${fmt(datos.ingresos)}</span></div>
-            <div style="border-top:1px solid var(--border); margin-top:5px; padding-top:5px; display:flex; justify-content:space-between; font-size:11px; font-weight:800;">
-                <span>Neto (I−G)</span>
-                <span style="color:${neto >= 0 ? 'var(--ingreso)' : 'var(--gasto)'}">${neto >= 0 ? '+' : ''}${fmt(neto)}</span>
-            </div>
-            ${htmlBudgets ? `<div style="margin-top:6px; border-top:1px dashed var(--border); padding-top:4px;">${htmlBudgets}</div>` : ''}
-        `;
-        listaReporte.appendChild(div);
-    });
-}
 
 function setValColor(id, text, positive) {
     const el = document.getElementById(id);
