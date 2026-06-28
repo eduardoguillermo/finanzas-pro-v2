@@ -616,6 +616,24 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
             #contenedor-impresion-pwa { display: block !important; padding: 20px; }
         }
     
+
+/* ── OVERRIDES: neutralizar CSS v1 que interfiere con layout v2 ── */
+html, body { height: 100% !important; overflow: auto !important; }
+body { height: 100% !important; width: 100% !important; overflow: auto !important; }
+header { display: flex !important; background: var(--primary) !important; 
+         justify-content: space-between !important; align-items: center !important;
+         padding: 0 20px !important; border-radius: 0 !important; border: none !important; }
+.app-container { width: auto !important; height: auto !important; 
+                 display: block !important; gap: 0 !important; }
+#app { display: flex !important; flex-direction: column !important; 
+       height: 100% !important; width: 100% !important; }
+#app-body { display: flex !important; flex-direction: row !important; 
+            flex: 1 !important; overflow: hidden !important; }
+#main-content { flex: 1 !important; display: flex !important; 
+                flex-direction: column !important; overflow: hidden !important; 
+                min-width: 0 !important; }
+.screen { display: none; flex-direction: column !important; }
+.screen.active { display: flex !important; }
 </style>
 </head>
 <body>
@@ -1072,7 +1090,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
 // ═══════════════════════════════════════════════════════════════
 //  NAVEGACIÓN v2
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '2.11';
+const APP_VERSION = '2.12';
 
 function v2NavTo(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
