@@ -286,7 +286,6 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
 
 <div id="app">
 
-  <!-- HEADER -->
   <header id="app-header">
     <h1>Finanzas<span>Pro</span> <span id="hdr-version" style="font-size:11px;font-weight:400;opacity:.6;"></span></h1>
     <div id="header-kpi">
@@ -302,8 +301,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
   </header>
 
   <div id="app-body">
-  <!-- BOTTOM NAV -->
-  <nav id="bottom-nav">
+    <nav id="bottom-nav">
     <button class="nav-btn active" data-screen="inicio" onclick="v2NavTo('inicio')">
       <span class="nav-icon">🏠</span>Inicio
     </button>
@@ -320,219 +318,390 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
       <span class="nav-icon">⚙️</span>Config
     </button>
   </nav>
-  <!-- SCREENS -->
-  <div id="screens">
+    <div id="main-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;">
 
-    <!-- ① INICIO -->
-    <div class="screen active" id="screen-inicio">
-      <!-- KPIs -->
-      <div class="kpi-grid">
-        <div class="kpi"><div class="kpi-label">Ingresos</div><div class="kpi-val" id="kpi-ingresos" style="color:var(--ingreso)">$0</div></div>
-        <div class="kpi"><div class="kpi-label">Gastos</div><div class="kpi-val" id="kpi-gastos" style="color:var(--gasto)">$0</div></div>
-        <div class="kpi"><div class="kpi-label">Balance mes</div><div class="kpi-val" id="kpi-balance">$0</div></div>
-        <div class="kpi"><div class="kpi-label">Efectivo</div><div class="kpi-val" id="kpi-efectivo" style="color:var(--primary)">$0</div></div>
-        <div class="kpi"><div class="kpi-label" id="kpi-label-banco1">Banco 1</div><div class="kpi-val" id="kpi-banco1" style="color:var(--primary)">$0</div></div>
+      <!-- INICIO -->
+      <div id="screen-inicio" class="screen active">
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">Ingresos</div><div class="kpi-val" id="kpi-ingresos" style="color:var(--ingreso)">$0</div></div>
+          <div class="kpi"><div class="kpi-label">Gastos</div><div class="kpi-val" id="kpi-gastos" style="color:var(--gasto)">$0</div></div>
+          <div class="kpi"><div class="kpi-label">Balance</div><div class="kpi-val" id="kpi-balance">$0</div></div>
+          <div class="kpi"><div class="kpi-label">Efectivo</div><div class="kpi-val" id="kpi-efectivo" style="color:var(--primary)">$0</div></div>
+          <div class="kpi"><div class="kpi-label" id="kpi-label-banco1">Banco 1</div><div class="kpi-val" id="kpi-banco1" style="color:var(--primary)">$0</div></div>
+        </div>
+        <div id="venc-widget-wrap" style="display:none;">
+          <div class="section-title"><span>⚠️ Vencimientos próximos</span></div>
+          <div class="card"><div id="venc-widget-list" class="card-body" style="padding:10px 16px;"></div></div>
+        </div>
+        <div>
+          <div class="section-title"><span>💰 Ahorros</span><button class="btn btn-sm btn-ghost" onclick="gmAbrirAhorros()">Ver →</button></div>
+          <div id="inicio-ahorros-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;"></div>
+        </div>
+        <div>
+          <div class="section-title"><span>📊 Últimos movimientos</span></div>
+          <div class="card"><div id="inicio-movs"></div></div>
+        </div>
+        <div>
+          <div class="section-title"><span>🏆 Top gastos del mes</span></div>
+          <div class="card"><div class="card-body" id="inicio-top5-dest"></div></div>
+        </div>
       </div>
-      <!-- Vencimientos widget (solo si hay) -->
-      <div id="venc-widget-wrap" style="display:none;">
-        <div class="section-title">⚠️ Próximos vencimientos</div>
+
+      <!-- DIARIO (v1 completo) -->
+      <div id="screen-diario" class="screen" style="padding:0;overflow:hidden;">
+        <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;height:100%;">
+          <div class="workspace-grid">
+
+        <!-- PANEL IZQUIERDO: CARGA / RUBROS / CUENTAS -->
+        <div class="panel">
+            <div class="tabs-header">
+                <button class="tab-btn active" data-tab="tab-carga">✍️ Carga</button>
+                <button class="tab-btn" data-tab="tab-rubros">📁 Rubros</button>
+                <button class="tab-btn" data-tab="tab-bancos">🏦 Cuentas</button>
+                <button class="tab-btn" data-tab="tab-fijos">📋 Fijos</button>
+
+            </div>
+
+            <!-- TAB CARGA -->
+            <div id="tab-carga" class="tab-content active">
+                <div class="form-section">
+                    <div class="form-group">
+                        <label for="mov-tipo-flujo">Tipo de operación</label>
+                        <select id="mov-tipo-flujo">
+                            <option value="presupuestado">Gasto / Ingreso</option>
+                            <option value="transferencia">🔄 Transferencia entre cuentas</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="mov-concepto">Concepto</label>
+                        <input type="text" id="mov-concepto" autocomplete="off" placeholder="Ej: Supermercado Día…">
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <div class="form-group" style="flex:1">
+                            <label for="mov-monto">Monto ($)</label>
+                            <input type="number" id="mov-monto" step="0.01" min="0.01" placeholder="0,00">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label for="mov-fecha">Fecha</label>
+                            <input type="date" id="mov-fecha">
+                        </div>
+                    </div>
+
+                    <!-- FLUJO ESTÁNDAR -->
+                    <div id="wrapper-carga-estandar">
+                        <div class="form-group">
+                            <label for="mov-rubro">Rubro / categoría</label>
+                            <select id="mov-rubro"></select>
+                            <div id="rubros-rapidos" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="mov-origen">Cuenta impactada</label>
+                            <select id="mov-origen"></select>
+                        </div>
+                    </div>
+
+                    <!-- TRANSFERENCIA -->
+                    <div id="wrapper-carga-transferencia" class="transf-block">
+                        <div class="form-group">
+                            <label for="mov-transf-origen" style="color:var(--gasto)">Origen (resta)</label>
+                            <select id="mov-transf-origen"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="mov-transf-destino" style="color:var(--ingreso)">Destino (suma)</label>
+                            <select id="mov-transf-destino"></select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mov-notas">Notas <span style="font-weight:400;color:var(--text-muted);font-size:10px;">(opcional)</span></label>
+                        <input type="text" id="mov-notas" autocomplete="off" placeholder="Detalle adicional...">
+                    </div>
+                    <button id="btn-guardar-movimiento" class="btn-primary btn-block" style="margin-top:8px;">
+                        ✓ Asentar registro
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB RUBROS -->
+            <div id="tab-rubros" class="tab-content">
+                <div class="form-section" style="margin-bottom:8px; background:var(--bg-subtle); padding:8px; border-radius:var(--radius-sm); border:1px solid var(--border);">
+                    <div class="form-group" style="margin-bottom:0">
+                        <label for="rubro-mes-visor">Límites del mes</label>
+                        <select id="rubro-mes-visor"></select>
+                    </div>
+                </div>
+                <div class="form-section" style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--border);">
+                    <div class="form-group">
+                        <label for="rubro-nombre">Nombre del rubro</label>
+                        <input type="text" id="rubro-nombre" autocomplete="off" placeholder="Ej: Combustible…">
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <div class="form-group" style="flex:1">
+                            <label for="rubro-tipo">Tipo</label>
+                            <select id="rubro-tipo">
+                                <option value="gasto">Gasto</option>
+                                <option value="ingreso">Ingreso</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="group-rubro-presupuesto" style="flex:1">
+                            <label for="rubro-limite">Límite ($)</label>
+                            <input type="number" id="rubro-limite" step="1" min="0" placeholder="Sin límite">
+                        </div>
+                    </div>
+                    <input type="hidden" id="rubro-edit-id" value="">
+                    <div style="display:flex; gap:4px;">
+                        <button id="btn-guardar-rubro" class="btn-primary btn-block">Guardar categoría</button>
+                        <button id="btn-cancelar-rubro" class="btn-secondary" style="display:none; padding:6px 10px; white-space:nowrap;">✕</button>
+                    </div>
+                </div>
+                <div class="scroll-list" id="lista-rubros"></div>
+            </div>
+
+            <!-- TAB CUENTAS/BANCOS -->
+            <div id="tab-bancos" class="tab-content">
+                <p style="font-size:11px; color:var(--text-muted); margin-bottom:10px; line-height:1.5;">
+                    Configurá los nombres de tus cuentas bancarias. Siempre existe la cuenta <strong>Efectivo</strong>.
+                </p>
+                <div class="form-group">
+                    <label for="cfg-debito1">Cuenta 1 (débito)</label>
+                    <input type="text" id="cfg-debito1" placeholder="Ej: Galicia">
+                </div>
+                <div class="form-group">
+                    <label for="cfg-debito2">Cuenta 2 (débito)</label>
+                    <input type="text" id="cfg-debito2" placeholder="Ej: Mercado Pago">
+                </div>
+                <div class="form-group">
+                    <label for="cfg-debito3">Cuenta 3 (opcional)</label>
+                    <input type="text" id="cfg-debito3" placeholder="Ej: Brubank">
+                </div>
+                <button id="btn-guardar-bancos" class="btn-secondary btn-block" style="margin-top:2px;">Actualizar nombres</button>
+
+                <hr style="margin:16px 0;border:none;border-top:1px solid var(--border);">
+                <div class="form-group">
+                    <label for="cfg-drive-client-id" style="display:flex;align-items:center;gap:6px;">
+                        ☁️ Google Drive <span style="font-size:10px;color:var(--text-muted);font-weight:400;">(opcional)</span>
+                    </label>
+                    <input type="text" id="cfg-drive-client-id" placeholder="xxxxxx.apps.googleusercontent.com" style="font-size:11px;">
+                    <p style="font-size:10px;color:var(--text-muted);margin:4px 0 8px;">Pegá tu Client ID de Google Cloud Console para habilitar backup en Drive.</p>
+                    <button class="btn-secondary btn-sm" onclick="gmGuardarClientId()">Guardar Client ID</button>
+                    <span id="drive-cfg-status" style="font-size:11px;margin-left:8px;color:var(--text-muted);"></span>
+                </div>
+            </div>
+
+            <!-- TAB FIJOS -->
+            <div id="tab-fijos" class="tab-content" style="flex-direction:column;gap:8px;overflow-y:auto;padding-bottom:8px;">
+                <div id="fijos-lista" style="flex:0 0 auto;"></div>
+                <div id="cuotas-lista" style="flex:0 0 auto;"></div>
+            </div>
+
+        </div>
+
+        <!-- PANEL CENTRAL: LIBRO DIARIO -->
+        <div class="panel">
+            <div class="libro-hdr">
+                <span class="panel-title" style="margin-bottom:0; padding-bottom:0; border-bottom:none;">📊 Libro diario</span>
+                <div style="display:flex; gap:4px; align-items:center;">
+                    <select id="filtro-avanzado" class="filter-select"></select>
+                    <button class="btn-dark btn-sm" onclick="ejecutarImpresionPWA()">🖨️</button>
+                </div>
+            </div>
+            <hr class="divider">
+
+            <div class="date-filter-strip">
+                <div class="date-filter-group">
+                    <label>Desde</label>
+                    <input type="date" id="filtro-fecha-desde">
+                </div>
+                <div class="date-filter-group">
+                    <label>Hasta</label>
+                    <input type="date" id="filtro-fecha-hasta">
+                </div>
+                <div>
+                    <button class="btn-secondary btn-sm" onclick="limpiarFiltrosFecha()" title="Limpiar fechas">✕</button>
+                </div>
+            </div>
+
+            <div class="live-counter-strip">
+                <small id="live-count-label">0 asientos</small>
+                <span>Total: <b id="live-total-unico" style="font-size:13px;">$0,00</b></span>
+            </div>
+
+            <div class="scroll-list" id="lista-movimientos"></div>
+        </div>
+
+        <!-- PANEL DERECHO: REPORTE MENSUAL -->
+        <div class="panel">
+            <span class="panel-title">📈 Presupuesto vs gastos</span>
+            <!-- Top 5 rubros -->
+            <div style="padding:10px 12px 0;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">🏆 Top gastos del mes</div>
+            <div id="top5-rubros" style="padding:8px 12px;border-bottom:1px solid var(--border);"></div>
+            <!-- Botón recurrentes -->
+            <div style="padding:8px 12px;border-bottom:1px solid var(--border);">
+                <button onclick="gmVerRecurrentes()" class="btn-secondary btn-block" style="font-size:12px;">🔁 Movimientos recurrentes</button>
+            </div>
+            <div class="scroll-list" id="lista-reporte-mensual"></div>
+        </div>
+    </div>
+
+
+              <!-- FOOTER -->
+    <footer>
+        <div class="footer-left">
+            <span style="color:var(--text-muted)" id="db-status">Almacenamiento local activo</span>
+            <span id="carpeta-status" style="display:none; font-size:10px; color:var(--ingreso); font-weight:700;"></span>
+            <span id="storage-warning" class="storage-warn">⚠️ Almacenamiento lleno</span>
+            <span id="pwa-update-toast" class="pwa-update-pill" onclick="forzarRecargaPWA()">🔄 Actualización disponible</span>
+        </div>
+        <div class="footer-right">
+            <button class="btn-secondary btn-sm" id="btn-carpeta" onclick="seleccionarCarpetaBackup()" title="Vincular carpeta para backup automático">📂 Carpeta</button>
+            <button class="btn-secondary btn-sm" onclick="exportarBackup()">📥 Exportar</button>
+            <button class="btn-secondary btn-sm" onclick="document.getElementById('file-import').click()">📤 Importar</button>
+            <button class="btn-secondary btn-sm" id="btn-gm-drive-up" onclick="gmDriveSubir()" title="Subir backup a Drive" style="display:none;background:#4285f4;color:white;border-color:#4285f4;">☁️ Drive</button>
+            <button class="btn-secondary btn-sm" id="btn-gm-drive-down" onclick="gmDriveRestaurar()" title="Restaurar desde Drive" style="display:none;background:#4285f4;color:white;border-color:#4285f4;">📂 Drive</button>
+            <button class="btn-secondary btn-sm" onclick="gmAbrirAhorros()" style="background:#0d9488;color:white;border-color:#0d9488;">💰 Ahorros</button>
+            <button class="btn-secondary btn-sm" onclick="gmAbrirTortas()" title="Gastos por rubro" style="background:#b45309;color:white;border-color:#b45309;">🥧 Rubros</button>
+            <button class="btn-secondary btn-sm" onclick="gmAbrirHistorial()" title="Ver historial mensual" style="background:#6d28d9;color:white;border-color:#6d28d9;">📅 Historial</button>
+            <button class="btn-secondary btn-sm" onclick="gmMostrarSnapshots()" title="Ver/restaurar snapshots locales" style="background:#0f766e;color:white;border-color:#0f766e;">💾 Local</button>
+            <button class="btn-secondary btn-sm" onclick="gmSalir()" title="Guardar y salir" style="background:#334155;color:white;border-color:#334155;">🚪 Salir</button>
+            <input type="file" id="file-import" accept=".json" style="display:none" onchange="importarBackup(event)">
+        </div>
+    </footer>
+</div>
+
+<div id="contenedor-impresion-pwa"></div>
+        </div>
+      </div>
+
+      <!-- REGISTRAR -->
+      <div id="screen-registrar" class="screen">
         <div class="card">
-          <div id="venc-widget-list" class="card-body" style="padding:8px 14px;"></div>
-        </div>
-      </div>
-      <!-- Ahorros resumen -->
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;" class="section-title">
-          <span>💰 Ahorros</span>
-          <button class="btn btn-sm btn-ghost" onclick="v2NavTo('ahorros')">Ver →</button>
-        </div>
-        <div id="inicio-ahorros-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
-      </div>
-      <!-- Últimos movimientos -->
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;" class="section-title">
-          <span>📊 Últimos movimientos</span>
-          <button class="btn btn-sm btn-ghost" onclick="v2NavTo('diario')">Ver todos →</button>
-        </div>
-        <div class="card"><div id="inicio-movs"></div></div>
-      </div>
-      <!-- Top 5 -->
-      <div>
-        <div class="section-title">🏆 Top gastos del mes</div>
-        <div class="card"><div class="card-body" id="inicio-top5"></div></div>
-      </div>
-    </div>
-
-    <!-- ② REGISTRAR -->
-    <div class="screen" id="screen-registrar">
-      <!-- Formulario -->
-      <div class="card">
-        <div class="card-header"><span class="card-title">✍️ Nuevo movimiento</span></div>
-        <div class="card-body">
-          <div class="form-group">
-            <label>Tipo</label>
-            <select id="v2-tipo-flujo" onchange="v2AlternarForm()">
-              <option value="presupuestado">Gasto / Ingreso</option>
-              <option value="transferencia">🔄 Transferencia</option>
-            </select>
-          </div>
-          <!-- Gasto/Ingreso -->
-          <div id="v2-form-gi">
-            <div class="form-group"><label>Concepto</label><input id="v2-concepto" type="text" placeholder="Ej: Supermercado…" autocomplete="off"></div>
-            <div class="form-row">
-              <div class="form-group"><label>Monto ($)</label><input id="v2-monto" type="number" step="0.01" min="0" placeholder="0,00"></div>
-              <div class="form-group"><label>Fecha</label><input id="v2-fecha" type="date"></div>
-            </div>
-            <div class="form-row">
-              <div class="form-group"><label>Rubro</label><select id="v2-rubro"></select></div>
-              <div class="form-group"><label>Cuenta</label><select id="v2-origen"></select></div>
-            </div>
-          </div>
-          <!-- Transferencia -->
-          <div id="v2-form-transf" style="display:none;">
-            <div class="form-group"><label>Concepto</label><input id="v2-transf-concepto" type="text" placeholder="Ej: Pase a débito"></div>
-            <div class="form-row">
-              <div class="form-group"><label>Monto ($)</label><input id="v2-transf-monto" type="number" step="0.01" min="0"></div>
-              <div class="form-group"><label>Fecha</label><input id="v2-transf-fecha" type="date"></div>
-            </div>
-            <div class="form-row">
-              <div class="form-group"><label>Desde</label><select id="v2-transf-origen"></select></div>
-              <div class="form-group"><label>Hacia</label><select id="v2-transf-destino"></select></div>
-            </div>
-          </div>
-          <button class="btn btn-primary btn-block" onclick="v2GuardarMovimiento()">✓ Registrar</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ③ DIARIO -->
-    <div class="screen" id="screen-diario">
-      <div class="card" style="flex-shrink:0;">
-        <div class="card-body" style="padding:8px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <select id="v2-filtro-tipo" onchange="v2RenderDiario()" style="flex:1;padding:6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;background:var(--bg-card);color:var(--text-main);">
-            <option value="">Todos</option>
-            <option value="ingreso">Ingresos</option>
-            <option value="gasto">Gastos</option>
-            <option value="transferencia">Transferencias</option>
-          </select>
-          <select id="v2-filtro-rubro" onchange="v2RenderDiario()" style="flex:1;padding:6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;background:var(--bg-card);color:var(--text-main);">
-            <option value="">Todos los rubros</option>
-          </select>
-          <input id="v2-filtro-desde" type="date" onchange="v2RenderDiario()" style="padding:6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;background:var(--bg-card);color:var(--text-main);">
-        </div>
-      </div>
-      <div class="card"><div id="v2-lista-movs"></div></div>
-      <div id="v2-diario-footer" style="text-align:center;padding:8px;font-size:12px;color:var(--text-muted);"></div>
-    </div>
-
-    <!-- ④ FIJOS -->
-    <div class="screen" id="screen-fijos">
-      <div id="v2-venc-alert" style="display:none;"></div>
-      <div class="seg-control">
-        <button class="seg-btn active" data-seg="seg-servicios" onclick="v2SegClick(this)">📋 Servicios</button>
-        <button class="seg-btn" data-seg="seg-cuotas" onclick="v2SegClick(this)">💳 Cuotas</button>
-      </div>
-      <div id="seg-servicios">
-        <button class="btn btn-primary btn-block btn-sm" onclick="gmAbrirFormServicio()" style="margin-bottom:8px;">➕ Nuevo servicio</button>
-        <div class="card"><div id="v2-servicios-list"></div></div>
-      </div>
-      <div id="seg-cuotas" style="display:none;">
-        <button class="btn btn-primary btn-block btn-sm" onclick="gmAbrirFormCuota()" style="margin-bottom:8px;background:var(--transferencia);">➕ Nueva cuota</button>
-        <div class="card"><div id="v2-cuotas-list"></div></div>
-      </div>
-    </div>
-
-    <!-- ⑤ CONFIG -->
-    <div class="screen" id="screen-config">
-      <div class="card">
-        <div class="card-header"><span class="card-title">💰 Ahorros</span><button class="btn btn-sm btn-ghost" onclick="gmAbrirAhorros()">Abrir →</button></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">📁 Cuentas y rubros</span></div>
-        <div class="card-body">
-          <div class="form-group"><label>Efectivo</label><input id="cfg-debito0" value="Efectivo" disabled style="background:var(--bg-subtle);"></div>
-          <div class="form-group"><label>Banco 1</label><input id="cfg-debito1" placeholder="Ej: Galicia"></div>
-          <div class="form-group"><label>Banco 2</label><input id="cfg-debito2" placeholder="Ej: Mercado Pago"></div>
-          <div class="form-group"><label>Banco 3 (opcional)</label><input id="cfg-debito3" placeholder="Ej: Brubank"></div>
-          <button class="btn btn-primary btn-sm" onclick="guardarCuentas()">Actualizar cuentas</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">📁 Rubros</span></div>
-        <div class="card-body" id="cfg-rubros-body">
-          <div class="form-row">
-            <div class="form-group"><label>Nombre</label><input id="rubro-nombre" placeholder="Ej: Alimentos"></div>
+          <div class="card-header"><span class="card-title">✍️ Nuevo movimiento</span></div>
+          <div class="card-body">
             <div class="form-group"><label>Tipo</label>
-              <select id="rubro-tipo" onchange="alternarInputPresupuesto()">
-                <option value="gasto">Gasto</option>
-                <option value="ingreso">Ingreso</option>
-              </select>
+              <select id="v2-tipo-flujo" onchange="v2AlternarForm()">
+                <option value="gi">Gasto / Ingreso</option>
+                <option value="transferencia">🔄 Transferencia</option>
+              </select></div>
+            <div id="v2-form-gi">
+              <div class="form-group"><label>Concepto</label><input id="v2-concepto" type="text" placeholder="Ej: Supermercado…" autocomplete="off"></div>
+              <div class="form-row">
+                <div class="form-group"><label>Monto ($)</label><input id="v2-monto" type="number" min="0" step="0.01"></div>
+                <div class="form-group"><label>Fecha</label><input id="v2-fecha" type="date"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Rubro</label><select id="v2-rubro"></select></div>
+                <div class="form-group"><label>Cuenta</label><select id="v2-origen"></select></div>
+              </div>
+            </div>
+            <div id="v2-form-transf" style="display:none;">
+              <div class="form-group"><label>Concepto</label><input id="v2-transf-concepto" type="text"></div>
+              <div class="form-row">
+                <div class="form-group"><label>Monto ($)</label><input id="v2-transf-monto" type="number" min="0"></div>
+                <div class="form-group"><label>Fecha</label><input id="v2-transf-fecha" type="date"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Desde</label><select id="v2-transf-origen"></select></div>
+                <div class="form-group"><label>Hacia</label><select id="v2-transf-destino"></select></div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" onclick="v2GuardarMovimiento()">✓ Registrar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FIJOS -->
+      <div id="screen-fijos" class="screen">
+        <div class="seg-control">
+          <button class="seg-btn active" data-seg="seg-servicios" onclick="v2SegClick(this)">📋 Servicios</button>
+          <button class="seg-btn" data-seg="seg-cuotas" onclick="v2SegClick(this)">💳 Cuotas</button>
+        </div>
+        <div id="seg-servicios">
+          <button class="btn btn-primary btn-block btn-sm" onclick="gmAbrirFormServicio()" style="margin-bottom:10px;">➕ Nuevo servicio</button>
+          <div class="card"><div id="v2-servicios-list"></div></div>
+        </div>
+        <div id="seg-cuotas" style="display:none;">
+          <button class="btn btn-primary btn-block btn-sm" onclick="gmAbrirFormCuota()" style="margin-bottom:10px;background:var(--transferencia);">➕ Nueva cuota</button>
+          <div class="card"><div id="v2-cuotas-list"></div></div>
+        </div>
+      </div>
+
+      <!-- CONFIG -->
+      <div id="screen-config" class="screen">
+        <div class="card">
+          <div class="card-header"><span class="card-title">📊 Reportes</span></div>
+          <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="gmAbrirHistorial()">📅 Historial</button>
+            <button class="btn btn-ghost" onclick="gmAbrirTortas()">🥧 Tortas</button>
+            <button class="btn btn-ghost" onclick="gmMostrarSnapshots()">💾 Snapshots</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">💰 Ahorros</span>
+            <button class="btn btn-sm btn-ghost" onclick="gmAbrirAhorros()">Abrir →</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">☁️ Drive & Backup</span></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label>Client ID Google Drive</label>
+              <input id="cfg-drive-client-id" placeholder="xxxxxx.apps.googleusercontent.com" style="font-size:12px;">
+              <button class="btn btn-ghost btn-sm" onclick="gmGuardarClientId()" style="margin-top:8px;">Guardar</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button id="btn-gm-drive-up" class="btn btn-sm" onclick="gmDriveSubir()" style="display:none;background:#4285f4;color:white;">☁️ Subir</button>
+              <button id="btn-gm-drive-down" class="btn btn-sm" onclick="gmDriveRestaurar()" style="display:none;background:#4285f4;color:white;">📂 Restaurar</button>
+              <button class="btn btn-ghost btn-sm" id="btn-carpeta" onclick="seleccionarCarpetaBackup()">📂 Carpeta local</button>
+              <span id="carpeta-status" style="display:none;font-size:11px;color:var(--ingreso);font-weight:700;align-self:center;"></span>
             </div>
           </div>
-          <div id="rubro-presup-wrap" class="form-group"><label>Presupuesto ($)</label><input id="rubro-limite" type="number" min="0" placeholder="0"></div>
-          <input type="hidden" id="rubro-edit-id">
-          <div style="display:flex;gap:8px;">
-            <button id="btn-guardar-rubro" class="btn btn-primary btn-sm">Guardar</button>
-            <button id="btn-cancelar-rubro" class="btn btn-ghost btn-sm" style="display:none;">Cancelar</button>
-          </div>
-          <div id="rubros-lista" style="margin-top:12px;"></div>
         </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">☁️ Drive & Backup</span></div>
-        <div class="card-body">
-          <div class="form-group">
-            <label>Google Drive Client ID</label>
-            <input id="cfg-drive-client-id" placeholder="xxxxxx.apps.googleusercontent.com" style="font-size:11px;">
-            <button class="btn btn-ghost btn-sm" onclick="gmGuardarClientId()" style="margin-top:6px;">Guardar</button>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-            <button id="btn-gm-drive-up" class="btn btn-sm" onclick="gmDriveSubir()" style="display:none;background:#4285f4;color:white;">☁️ Subir</button>
-            <button id="btn-gm-drive-down" class="btn btn-sm" onclick="gmDriveRestaurar()" style="display:none;background:#4285f4;color:white;">📂 Restaurar</button>
-            <button class="btn btn-ghost btn-sm" id="btn-carpeta" onclick="seleccionarCarpetaBackup()">📂 Carpeta local</button>
-            <span id="carpeta-status" style="display:none;font-size:10px;color:var(--ingreso);font-weight:700;align-self:center;"></span>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">📦 Datos</span></div>
-        <div class="card-body">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="card">
+          <div class="card-header"><span class="card-title">📦 Datos</span></div>
+          <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-ghost btn-sm" onclick="exportarBackup()">📥 Exportar JSON</button>
-            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('file-import').click()">📤 Importar JSON</button>
-            <button class="btn btn-ghost btn-sm" onclick="v2AbrirHistorial()">📅 Historial</button>
-            <button class="btn btn-ghost btn-sm" onclick="gmAbrirTortas()">🥧 Tortas</button>
-            <button class="btn btn-ghost btn-sm" onclick="gmMostrarSnapshots()">💾 Snapshots</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('file-import').click()">📤 Importar</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportarExcel()">📊 Excel</button>
             <button class="btn btn-sm" onclick="gmSalir()" style="background:#334155;color:white;">🚪 Salir</button>
           </div>
-          <input type="file" id="file-import" accept=".json" style="display:none" onchange="importarBackup(event)">
-          <span id="storage-warning" class="storage-warn" style="margin-top:8px;display:block;">⚠️ Almacenamiento lleno</span>
-          <span id="pwa-update-toast" class="pwa-update-pill" onclick="forzarRecargaPWA()" style="margin-top:8px;">🔄 Actualización disponible</span>
-          <span id="db-status" style="font-size:10px;color:var(--text-muted);display:block;margin-top:6px;"></span>
+          <div class="card-body" style="padding-top:0;">
+            <input type="file" id="file-import" accept=".json" style="display:none" onchange="importarBackup(event)">
+            <span id="storage-warning" class="storage-warn">⚠️ Almacenamiento lleno</span>
+            <span id="pwa-update-toast" class="pwa-update-pill" onclick="forzarRecargaPWA()">🔄 Actualización</span>
+            <span id="db-status" style="font-size:10px;color:var(--text-muted);display:block;margin-top:6px;"></span>
+          </div>
         </div>
       </div>
-    </div>
 
-  </div><!-- /screens -->
-  </div><!-- /app-body -->
-</div><!-- /app -->
-
-<!-- CONFIRM MODAL (reutilizado del sistema original) -->
-<div id="modal-overlay">
-  <div id="modal-box">
-    <div id="modal-title"></div>
-    <div id="modal-body"></div>
-    <div class="modal-btns">
-      <button id="modal-cancel" class="btn btn-ghost">Cancelar</button>
-      <button id="modal-confirm" class="btn btn-danger">Confirmar</button>
     </div>
   </div>
 </div>
 
-<div id="toast-container"></div>
-<div id="contenedor-impresion-pwa"></div>
-<div id="top5-rubros" style="display:none;"></div>
+<!-- SPLASH -->
+<div id="splash">
+    <div class="splash-logo">Finanzas<span>Pro</span></div>
+    <div class="splash-version">v13.56 · Ledger Edition</div>
+    <div style="position:absolute;bottom:18%;right:8%;font-family:'Dancing Script',cursive;font-size:32px;color:#93c5fd;pointer-events:none">Development by Guille</div>
+    <div class="splash-progress-track">
+        <div class="splash-progress-bar" id="splash-bar"></div>
+    </div>
+</div>
 
+<!-- TOASTS -->
+<div id="toast-container"></div>
+
+<!-- MODAL CONFIRMACIÓN -->
+<div id="modal-overlay">
+    <div class="modal-box">
+        <h4 id="modal-title">¿Confirmar acción?</h4>
+        <p id="modal-body"></p>
+        <div class="modal-actions">
+            <button class="btn-secondary btn-sm" id="modal-cancel">Cancelar</button>
+            <button class="btn-danger btn-sm" id="modal-confirm">Confirmar</button>
+        </div>
+    </div>
+</div>
+<div id="top5-rubros" style="display:none;"></div>
 
 <script src="xlsx.full.min.js"></script>
 <script>
@@ -888,7 +1057,8 @@ function renderRubros() { if (document.getElementById('screen-config').classList
 function gmRenderFijos()    { v2RenderFijosV2(); }
 function gmRenderServicios(){ v2RenderServiciosV2(); }
 function gmRenderCuotas()   { v2RenderCuotasV2(); }
-
+</script>
+<script>
 // ════════════════════════════════════════════════════
 //  CONSTANTES Y ESTADO GLOBAL
 // ════════════════════════════════════════════════════
