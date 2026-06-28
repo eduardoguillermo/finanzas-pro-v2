@@ -49,9 +49,11 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
 .hkpi-val{font-size:15px;font-weight:800;margin-top:1px;}
 
 #app-body{flex:1;display:flex;overflow:hidden;min-width:0;}
+#main-content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
 
 /* ── SCREENS ── */
 #screens{flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0;background:var(--bg-main);}
+.app-container{height:auto !important;overflow:visible !important;}
 .screen{display:none;flex-direction:column;gap:12px;overflow-y:auto;
   flex:1;padding:20px;box-sizing:border-box;}
 .screen.active{display:flex;}
@@ -669,19 +671,21 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
 
       <!-- INICIO -->
       <div id="screen-inicio" class="screen active">
-        <div class="kpi-grid">
+        <div class="kpi-grid" id="inicio-kpi-grid">
           <div class="kpi"><div class="kpi-label">Ingresos</div><div class="kpi-val" id="kpi-ingresos" style="color:var(--ingreso)">$0</div></div>
           <div class="kpi"><div class="kpi-label">Gastos</div><div class="kpi-val" id="kpi-gastos" style="color:var(--gasto)">$0</div></div>
-          <div class="kpi"><div class="kpi-label">Balance</div><div class="kpi-val" id="kpi-balance">$0</div></div>
+          <div class="kpi"><div class="kpi-label">Balance mes</div><div class="kpi-val" id="kpi-balance">$0</div></div>
           <div class="kpi"><div class="kpi-label">Efectivo</div><div class="kpi-val" id="kpi-efectivo" style="color:var(--primary)">$0</div></div>
-          <div class="kpi"><div class="kpi-label" id="kpi-label-banco1">Banco 1</div><div class="kpi-val" id="kpi-banco1" style="color:var(--primary)">$0</div></div>
+          <div class="kpi"><div class="kpi-label" id="kpi-label-banco1">—</div><div class="kpi-val" id="kpi-banco1" style="color:var(--primary)">$0</div></div>
+          <div class="kpi"><div class="kpi-label" id="kpi-label-banco2">—</div><div class="kpi-val" id="kpi-banco2" style="color:var(--primary)">$0</div></div>
+          <div class="kpi"><div class="kpi-label" id="kpi-label-banco3">—</div><div class="kpi-val" id="kpi-banco3" style="color:var(--primary);display:none;">$0</div></div>
         </div>
         <div id="venc-widget-wrap" style="display:none;">
           <div class="section-title"><span>⚠️ Vencimientos próximos</span></div>
           <div class="card"><div id="venc-widget-list" class="card-body" style="padding:10px 16px;"></div></div>
         </div>
         <div>
-          <div class="section-title"><span>💰 Ahorros</span><button class="btn btn-sm btn-ghost" onclick="gmAbrirAhorros()">Ver →</button></div>
+          <div class="section-title"><span>💰 Ahorros</span></div>
           <div id="inicio-ahorros-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;"></div>
         </div>
         <div>
@@ -1068,7 +1072,7 @@ html,body{height:100%;background:var(--bg-main);color:var(--text-main);
 // ═══════════════════════════════════════════════════════════════
 //  NAVEGACIÓN v2
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '2.10';
+const APP_VERSION = '2.11';
 
 function v2NavTo(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -1199,12 +1203,28 @@ function v2RenderInicio() {
     kpiBal.style.color = balance >= 0 ? 'var(--ingreso)' : 'var(--gasto)';
 
     // Saldos de cuentas
+    const cuentas = getCuentas();
     const kpiEf = document.getElementById('kpi-efectivo');
-    const kpiB1 = document.getElementById('kpi-banco1');
-    const kpiLB1 = document.getElementById('kpi-label-banco1');
     if (kpiEf) kpiEf.textContent = fmt(m.saldos.efectivo || 0);
-    if (kpiB1) kpiB1.textContent = fmt(m.saldos.debito1 || 0);
-    if (kpiLB1) kpiLB1.textContent = DB.cuentas.debito1 || 'Banco 1';
+    const bancos = [
+        {lbl:'kpi-label-banco1', val:'kpi-banco1', key:'debito1'},
+        {lbl:'kpi-label-banco2', val:'kpi-banco2', key:'debito2'},
+        {lbl:'kpi-label-banco3', val:'kpi-banco3', key:'debito3'},
+    ];
+    bancos.forEach(b => {
+        const nombre = DB.cuentas[b.key];
+        const lEl = document.getElementById(b.lbl);
+        const vEl = document.getElementById(b.val);
+        if (!lEl || !vEl) return;
+        if (nombre) {
+            lEl.textContent = nombre;
+            vEl.textContent = fmt(m.saldos[b.key] || 0);
+            vEl.style.display = '';
+            lEl.closest('.kpi').style.display = '';
+        } else {
+            lEl.closest('.kpi').style.display = 'none';
+        }
+    });
     // Header
     const balTotal = Object.values(m.saldos).reduce((a,v)=>a+v,0);
     document.getElementById('hdr-balance').textContent = fmt(balTotal);
