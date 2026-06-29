@@ -3605,7 +3605,7 @@ function gmCargarCuentasShare() {
 //  MÓDULO GMAIL API · Detección automática mails Santander
 // ════════════════════════════════════════════════════
 
-const GM_SANTANDER_FROM = 'mensajesyavisos@mails.santander.com.ar';
+const GM_SANTANDER_QUERY = 'subject:(Pagaste OR "débito automático" OR "débito con tu") newer_than:30d';
 
 function gmGmailGetProcessed() {
     try { return JSON.parse(localStorage.getItem(GM_GMAIL_PROCESSED_KEY)) || []; }
@@ -3667,7 +3667,7 @@ function gmGmailExtraerTexto(payload) {
 
 async function gmGmailBuscarGastos(token) {
     // Buscar mails de Santander no leídos o recientes (últimos 30 días)
-    const query = encodeURIComponent(`from:${GM_SANTANDER_FROM} newer_than:30d`);
+    const query = encodeURIComponent(GM_SANTANDER_QUERY);
     const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=10`;
 
     const resp = await fetch(url, {
