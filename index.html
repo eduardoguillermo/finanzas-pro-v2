@@ -3667,27 +3667,30 @@ function gmCheckShareTarget() {
     const texto = shareText || shareTitle;
     if (!texto) return;
 
-    // Intentar parsear como mail Santander
-    const datos = gmParsearMailSantander(texto);
-    if (datos) {
-        // Esperar a que DB esté cargada
-        setTimeout(() => {
-            gmCargarCuentasShare();
+    console.log('[ShareTarget] Texto recibido:', texto.substring(0, 120));
+
+    const abrirModal = () => {
+        gmCargarCuentasShare();
+        const datos = gmParsearMailSantander(texto);
+        if (datos) {
+            console.log('[ShareTarget] Datos parseados:', JSON.stringify(datos));
             gmAbrirShareModal(datos);
-        }, 600);
-    } else {
-        // Texto recibido pero no es mail bancario → mostrar modal con datos vacíos
-        setTimeout(() => {
-            gmCargarCuentasShare();
+        } else {
+            console.log('[ShareTarget] No reconocido, abriendo vacío');
             gmAbrirShareModal({
-                moneda: 'ARS', monto: null, comercio: '', fecha: hoyISO(),
-                cuotas: 1, tarjeta: '', tipo_tarjeta: ''
+                moneda: 'ARS', monto: null,
+                comercio: texto.substring(0, 60),
+                fecha: hoyISO(), cuotas: 1, tarjeta: '', tipo_tarjeta: ''
             });
-            document.getElementById('share-warn').style.display = 'block';
-            document.getElementById('share-warn').textContent =
-                '⚠️ No se reconoció el formato del mail. Completá los campos manualmente.';
-        }, 600);
-    }
+            const warn = document.getElementById('share-warn');
+            if (warn) {
+                warn.style.display = 'block';
+                warn.textContent = '⚠️ No se reconoció el formato del mail. Revisá los campos.';
+            }
+        }
+    };
+
+    setTimeout(abrirModal, 900);
 }
 </script>
 
