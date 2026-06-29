@@ -498,76 +498,13 @@
 <!-- SPLASH -->
 <div id="splash">
     <div class="splash-logo">Finanzas<span>Pro</span></div>
-    <div class="splash-version" style="display:flex;align-items:baseline;gap:8px;justify-content:center;">v13.81 · Ledger Edition <span style="font-family:'Dancing Script',cursive;font-size:17px;color:#93c5fd;">especial para Mariela</span></div>
+    <div class="splash-version" style="display:flex;align-items:baseline;gap:8px;justify-content:center;">v13.82 · Ledger Edition <span style="font-family:'Dancing Script',cursive;font-size:17px;color:#93c5fd;">especial para Mariela</span></div>
     <div style="position:absolute;bottom:18%;right:8%;font-family:'Dancing Script',cursive;font-size:32px;color:#93c5fd;pointer-events:none">Development by Guille</div>
     <div class="splash-progress-track">
         <div class="splash-progress-bar" id="splash-bar"></div>
     </div>
 </div>
 
-<!-- ── MODAL SHARE TARGET ── -->
-<div id="share-overlay">
-    <div id="share-modal">
-        <div class="share-header">
-            <span class="share-icon">📧</span>
-            <h3>Gasto detectado</h3>
-            <span class="share-badge">Santander</span>
-        </div>
-
-        <div id="share-warn" class="share-warn"></div>
-
-        <div class="share-field moneda-row">
-            <div>
-                <label>Monto</label>
-                <input type="number" id="share-monto" step="0.01" min="0.01" placeholder="0.00">
-            </div>
-            <div>
-                <label>Moneda</label>
-                <select id="share-moneda">
-                    <option value="ARS">$ ARS</option>
-                    <option value="USD">U$S USD</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="share-field">
-            <label>Comercio</label>
-            <input type="text" id="share-comercio" placeholder="Nombre del comercio">
-            <div class="share-tag-tarjeta" id="share-tarjeta-label"></div>
-        </div>
-
-        <div class="share-field moneda-row">
-            <div>
-                <label>Fecha</label>
-                <input type="date" id="share-fecha">
-            </div>
-            <div>
-                <label>Cuotas</label>
-                <input type="number" id="share-cuotas" min="1" max="72" value="1">
-            </div>
-        </div>
-
-        <div class="share-field">
-            <label>Rubro / Categoría</label>
-            <select id="share-rubro"></select>
-        </div>
-
-        <div class="share-field">
-            <label>Cuenta impactada</label>
-            <select id="share-cuenta"></select>
-        </div>
-
-        <div class="share-field">
-            <label>Notas (opcional)</label>
-            <input type="text" id="share-notas" placeholder="Detalle adicional...">
-        </div>
-
-        <div class="share-actions">
-            <button id="btn-share-cancelar" onclick="gmCerrarShare()">✕ Cancelar</button>
-            <button id="btn-share-confirmar" onclick="gmConfirmarShare()">✓ Registrar gasto</button>
-        </div>
-    </div>
-</div>
 
 <!-- TOASTS -->
 <div id="toast-container"></div>
@@ -846,7 +783,7 @@
 // ════════════════════════════════════════════════════
 //  CONSTANTES Y ESTADO GLOBAL
 // ════════════════════════════════════════════════════
-const APP_VERSION = '13.81';
+const APP_VERSION = '13.82';
 
 // ── Google Drive (desactivado hasta que el usuario configure Client ID) ─────
 const GM_DRIVE_SCOPE    = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/gmail.readonly';
@@ -3495,6 +3432,10 @@ window.addEventListener('DOMContentLoaded', function() {
     render();
     setTimeout(gmMostrarVencimientos, 800);
     // Módulo Share Target: detectar mail compartido desde Gmail
+    // Mover share-overlay al tope del DOM para evitar problemas de stacking context
+    const _shareOv = document.getElementById('share-overlay');
+    if (_shareOv) document.body.appendChild(_shareOv);
+
     gmCheckShareTarget();
     // Módulo Gmail API: chequear mails de Santander automáticamente en PC
     gmGmailChequear();
@@ -3990,6 +3931,70 @@ function gmCheckShareTarget() {
     }
 }
 </script>
+
+<!-- ── MODAL SHARE TARGET ── -->
+<div id="share-overlay">
+    <div id="share-modal">
+        <div class="share-header">
+            <span class="share-icon">📧</span>
+            <h3>Gasto detectado</h3>
+            <span class="share-badge">Santander</span>
+        </div>
+
+        <div id="share-warn" class="share-warn"></div>
+
+        <div class="share-field moneda-row">
+            <div>
+                <label>Monto</label>
+                <input type="number" id="share-monto" step="0.01" min="0.01" placeholder="0.00">
+            </div>
+            <div>
+                <label>Moneda</label>
+                <select id="share-moneda">
+                    <option value="ARS">$ ARS</option>
+                    <option value="USD">U$S USD</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="share-field">
+            <label>Comercio</label>
+            <input type="text" id="share-comercio" placeholder="Nombre del comercio">
+            <div class="share-tag-tarjeta" id="share-tarjeta-label"></div>
+        </div>
+
+        <div class="share-field moneda-row">
+            <div>
+                <label>Fecha</label>
+                <input type="date" id="share-fecha">
+            </div>
+            <div>
+                <label>Cuotas</label>
+                <input type="number" id="share-cuotas" min="1" max="72" value="1">
+            </div>
+        </div>
+
+        <div class="share-field">
+            <label>Rubro / Categoría</label>
+            <select id="share-rubro"></select>
+        </div>
+
+        <div class="share-field">
+            <label>Cuenta impactada</label>
+            <select id="share-cuenta"></select>
+        </div>
+
+        <div class="share-field">
+            <label>Notas (opcional)</label>
+            <input type="text" id="share-notas" placeholder="Detalle adicional...">
+        </div>
+
+        <div class="share-actions">
+            <button id="btn-share-cancelar" onclick="gmCerrarShare()">✕ Cancelar</button>
+            <button id="btn-share-confirmar" onclick="gmConfirmarShare()">✓ Registrar gasto</button>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>
