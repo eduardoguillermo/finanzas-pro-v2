@@ -498,7 +498,7 @@
 <!-- SPLASH -->
 <div id="splash">
     <div class="splash-logo">Finanzas<span>Pro</span></div>
-    <div class="splash-version" style="display:flex;align-items:baseline;gap:8px;justify-content:center;">v13.85 · Ledger Edition <span style="font-family:'Dancing Script',cursive;font-size:17px;color:#93c5fd;">especial para Mariela</span></div>
+    <div class="splash-version" style="display:flex;align-items:baseline;gap:8px;justify-content:center;">v13.86 · Ledger Edition <span style="font-family:'Dancing Script',cursive;font-size:17px;color:#93c5fd;">especial para Mariela</span></div>
     <div style="position:absolute;bottom:18%;right:8%;font-family:'Dancing Script',cursive;font-size:32px;color:#93c5fd;pointer-events:none">Development by Guille</div>
     <div class="splash-progress-track">
         <div class="splash-progress-bar" id="splash-bar"></div>
@@ -783,7 +783,7 @@
 // ════════════════════════════════════════════════════
 //  CONSTANTES Y ESTADO GLOBAL
 // ════════════════════════════════════════════════════
-const APP_VERSION = '13.85';
+const APP_VERSION = '13.86';
 
 // ── Google Drive (desactivado hasta que el usuario configure Client ID) ─────
 const GM_DRIVE_SCOPE    = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/gmail.readonly';
@@ -3543,14 +3543,77 @@ function gmParsearMailSantander(texto) {
 }
 
 function gmAbrirShareModal(datos) {
-    const overlay = document.getElementById('share-overlay');
-    if (!overlay) return;
+    // Eliminar overlay previo si existe
+    const prev = document.getElementById('share-overlay');
+    if (prev) prev.remove();
 
-    // Primero ocultar, mover al body, luego mostrar
-    overlay.style.display = 'none';
+    // Crear overlay dinámicamente para evitar problemas de stacking context
+    const overlay = document.createElement('div');
+    overlay.id = 'share-overlay';
+    overlay.style.cssText = [
+        'position:fixed', 'top:0', 'left:0', 'width:100vw', 'height:100vh',
+        'background:rgba(0,0,0,0.72)', 'z-index:2147483647',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'padding:16px', 'box-sizing:border-box'
+    ].join(';');
+
+    overlay.innerHTML = `
+    <div id="share-modal" style="background:var(--bg-card);border-radius:14px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;padding:20px 18px 24px;box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px;">
+            <span style="font-size:26px;">📧</span>
+            <h3 id="share-modal-title" style="font-size:15px;font-weight:700;color:var(--text-main);margin:0;flex:1;">Gasto detectado</h3>
+            <span style="font-size:10px;background:#2563eb;color:white;padding:2px 7px;border-radius:20px;font-weight:600;">Santander</span>
+        </div>
+        <div id="share-warn" style="display:none;font-size:12px;color:#b45309;background:#fef3c7;border-radius:7px;padding:7px 10px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;margin-bottom:11px;">
+            <div style="flex:1;">
+                <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Monto</label>
+                <input type="number" id="share-monto" step="0.01" min="0.01" placeholder="0.00" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-main);color:var(--text-main);font-size:14px;box-sizing:border-box;">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Moneda</label>
+                <select id="share-moneda" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-main);color:var(--text-main);font-size:14px;box-sizing:border-box;">
+                    <option value="ARS">$ ARS</option>
+                    <option value="USD">U$S USD</option>
+                </select>
+            </div>
+        </div>
+        <div style="margin-bottom:11px;">
+            <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Comercio</label>
+            <input type="text" id="share-comercio" placeholder="Nombre del comercio" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-main);color:var(--text-main);font-size:14px;box-sizing:border-box;">
+            <div id="share-tarjeta-label" style="font-size:11px;color:var(--text-muted);margin-top:4px;"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:11px;">
+            <div style="flex:1;">
+                <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Fecha</label>
+                <input type="date" id="share-fecha" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-main);color:var(--text-main);font-size:14px;box-sizing:border-box;">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Cuotas</label>
+                <input type="number" id="share-cuotas" min="1" max="72" value="1" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-main);color:var(--text-main);font-size:14px;box-sizing:border-box;">
+            </div>
+        </div>
+        <div style="margin-bottom:11px;">
+            <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Rubro / Categoría</label>
+            <select id="share-rubro" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-main);color:var(--text-main);font-size:14px;box-sizing:border-box;"></select>
+        </div>
+        <div style="margin-bottom:11px;">
+            <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Cuenta impactada</label>
+            <select id="share-cuenta" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-main);color:var(--text-main);font-size:14px;box-sizing:border-box;"></select>
+        </div>
+        <div style="margin-bottom:11px;">
+            <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Notas (opcional)</label>
+            <input type="text" id="share-notas" placeholder="Detalle adicional..." style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-main);color:var(--text-main);font-size:14px;box-sizing:border-box;">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+            <button onclick="gmCerrarShare()" style="flex:1;padding:12px;border-radius:10px;font-size:14px;font-weight:700;border:1.5px solid var(--border);background:var(--bg-main);color:var(--text-main);cursor:pointer;">✕ Cancelar</button>
+            <button onclick="gmConfirmarShare()" style="flex:1;padding:12px;border-radius:10px;font-size:14px;font-weight:700;border:none;background:var(--primary);color:white;cursor:pointer;">✓ Registrar gasto</button>
+        </div>
+    </div>`;
+
     document.body.appendChild(overlay);
 
-    // Poblar campos primero
+    // Poblar campos
     document.getElementById('share-monto').value    = datos.monto ? datos.monto.toFixed(2) : '';
     document.getElementById('share-moneda').value   = datos.moneda || 'ARS';
     document.getElementById('share-comercio').value = datos.comercio || '';
@@ -3586,21 +3649,6 @@ function gmAbrirShareModal(datos) {
     } else {
         warn.style.display = 'none';
     }
-
-    // Mostrar overlay con estilos forzados
-    const s = overlay.style;
-    s.setProperty('position',         'fixed',             'important');
-    s.setProperty('top',              '0',                 'important');
-    s.setProperty('left',             '0',                 'important');
-    s.setProperty('width',            '100vw',             'important');
-    s.setProperty('height',           '100vh',             'important');
-    s.setProperty('background-color', 'rgba(0,0,0,0.72)', 'important');
-    s.setProperty('z-index',          '999999',            'important');
-    s.setProperty('align-items',      'center',            'important');
-    s.setProperty('justify-content',  'center',            'important');
-    s.setProperty('padding',          '16px',              'important');
-    s.setProperty('box-sizing',       'border-box',        'important');
-    s.setProperty('display',          'flex',              'important');
 }
 
 function gmCargarRubrosShare() {
@@ -3946,69 +3994,6 @@ function gmCheckShareTarget() {
 }
 </script>
 
-<!-- ── MODAL SHARE TARGET ── -->
-<div id="share-overlay">
-    <div id="share-modal">
-        <div class="share-header">
-            <span class="share-icon">📧</span>
-            <h3>Gasto detectado</h3>
-            <span class="share-badge">Santander</span>
-        </div>
-
-        <div id="share-warn" class="share-warn"></div>
-
-        <div class="share-field moneda-row">
-            <div>
-                <label>Monto</label>
-                <input type="number" id="share-monto" step="0.01" min="0.01" placeholder="0.00">
-            </div>
-            <div>
-                <label>Moneda</label>
-                <select id="share-moneda">
-                    <option value="ARS">$ ARS</option>
-                    <option value="USD">U$S USD</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="share-field">
-            <label>Comercio</label>
-            <input type="text" id="share-comercio" placeholder="Nombre del comercio">
-            <div class="share-tag-tarjeta" id="share-tarjeta-label"></div>
-        </div>
-
-        <div class="share-field moneda-row">
-            <div>
-                <label>Fecha</label>
-                <input type="date" id="share-fecha">
-            </div>
-            <div>
-                <label>Cuotas</label>
-                <input type="number" id="share-cuotas" min="1" max="72" value="1">
-            </div>
-        </div>
-
-        <div class="share-field">
-            <label>Rubro / Categoría</label>
-            <select id="share-rubro"></select>
-        </div>
-
-        <div class="share-field">
-            <label>Cuenta impactada</label>
-            <select id="share-cuenta"></select>
-        </div>
-
-        <div class="share-field">
-            <label>Notas (opcional)</label>
-            <input type="text" id="share-notas" placeholder="Detalle adicional...">
-        </div>
-
-        <div class="share-actions">
-            <button id="btn-share-cancelar" onclick="gmCerrarShare()">✕ Cancelar</button>
-            <button id="btn-share-confirmar" onclick="gmConfirmarShare()">✓ Registrar gasto</button>
-        </div>
-    </div>
-</div>
 
 </body>
 </html>
