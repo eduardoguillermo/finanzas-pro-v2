@@ -3482,44 +3482,36 @@ function gmParsearMailSantander(texto) {
         hora: '',
         cuotas: null,
         tarjeta: '',
+        tipo_tarjeta: 'Tarjeta',
         tipo: 'gasto'
     };
 
-    // Moneda y monto · soporta $1.350,00 · U$S6,50 · U$S 6,50 · $1350.00
-    const rMoneda = /(?:Monto\s*[\r\n]*\s*)?(U\$S\s?|U\$s\s?|\$\s?)([\d.,]+)/i.exec(texto);
-    if (rMoneda) {
-        const prefijo = rMoneda[1].trim().toUpperCase();
-        resultado.moneda = (prefijo === 'U$S' || prefijo === 'U$S') ? 'USD' : 'ARS';
-        // Normalizar número: quitar puntos de miles, convertir coma decimal
-        let numStr = rMoneda[2].replace(/\./g, '').replace(',', '.');
-        resultado.monto = parseFloat(numStr);
+    // Moneda y monto — formato pegado: "Monto$1.350,00" o "MontoU$S6,50"
+    const rUSD = /MontoU\$S\s?([\d.,]+)/i.exec(texto);
+    const rARS = /Monto\$([\d.,]+)/i.exec(texto);
+    if (rUSD) {
+        resultado.moneda = 'USD';
+        resultado.monto = parseFloat(rUSD[1].replace(/\./g,'').replace(',','.'));
+    } else if (rARS) {
+        resultado.moneda = 'ARS';
+        resultado.monto = parseFloat(rARS[1].replace(/\./g,'').replace(',','.'));
     }
 
-    // Comercio
-    const rComercio = /Comercio\s*[\r\n]+\s*([^\r\n]+)/i.exec(texto);
-    if (rComercio) {
-        resultado.comercio = rComercio[1].trim();
-        // Multi-línea: a veces el nombre del comercio sigue en la línea siguiente
-        const pos = texto.indexOf(rComercio[1]);
-        const resto = texto.substring(pos + rComercio[1].length).match(/^\s*([A-Z][A-Z0-9 *\-]+)/);
-        if (resto && resto[1].trim() !== rComercio[1].trim()) {
-            resultado.comercio = (rComercio[1] + ' ' + resto[1]).trim();
-        }
-    }
-
-    // Fecha dd/mm/yyyy → yyyy-mm-dd
-    const rFecha = /Fecha\s*[\r\n]+\s*(\d{2})\/(\d{2})\/(\d{4})/i.exec(texto);
-    if (rFecha) {
-        resultado.fecha = `${rFecha[3]}-${rFecha[2]}-${rFecha[1]}`;
-    }
-
-    // Hora
-    const rHora = /Hora\s*[\r\n]+\s*(\d{2}:\d{2})/i.exec(texto);
-    if (rHora) resultado.hora = rHora[1];
-
-    // Cuotas
-    const rCuotas = /Cuotas\s*[\r\n]+\s*(\d+)/i.exec(texto);
+    // Cuotas — formato pegado: "Cuotas1"
+    const rCuotas = /Cuotas(\d+)/i.exec(texto);
     if (rCuotas) resultado.cuotas = parseInt(rCuotas[1]);
+
+    // Comercio — formato pegado: "ComercioMERPAGO*LASDELICIAS"
+    const rComercio = /Comercio([A-ZÁÉÍÓÚÑ0-9 .*\-&]+)/i.exec(texto);
+    if (rComercio) resultado.comercio = rComercio[1].trim();
+
+    // Fecha — formato pegado: "Fecha28/06/2026" → yyyy-mm-dd
+    const rFecha = /Fecha(\d{2})\/(\d{2})\/(\d{4})/i.exec(texto);
+    if (rFecha) resultado.fecha = `${rFecha[3]}-${rFecha[2]}-${rFecha[1]}`;
+
+    // Hora — formato pegado: "Hora09:24"
+    const rHora = /Hora(\d{2}:\d{2})/i.exec(texto);
+    if (rHora) resultado.hora = rHora[1];
 
     // Número de tarjeta
     const rTarjeta = /terminada en (\d{4})/i.exec(texto);
@@ -3528,9 +3520,8 @@ function gmParsearMailSantander(texto) {
     // Tipo de tarjeta
     if (/american express|amex/i.test(texto)) resultado.tipo_tarjeta = 'Amex';
     else if (/visa/i.test(texto)) resultado.tipo_tarjeta = 'Visa Crédito';
-    else resultado.tipo_tarjeta = 'Tarjeta';
 
-    // Tipo de movimiento: cuotas > 1 → cuota, sino gasto
+    // Tipo de movimiento
     resultado.tipo = (resultado.cuotas && resultado.cuotas > 1) ? 'cuota' : 'gasto';
 
     return resultado;
