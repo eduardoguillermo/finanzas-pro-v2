@@ -781,7 +781,8 @@
 const APP_VERSION = '13.77';
 
 // ── Google Drive (desactivado hasta que el usuario configure Client ID) ─────
-const GM_DRIVE_SCOPE    = 'https://www.googleapis.com/auth/drive.appdata';
+const GM_DRIVE_SCOPE    = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/gmail.readonly';
+const GM_GMAIL_PROCESSED_KEY = 'gm_gmail_processed'; // IDs de mails ya procesados
 const GM_GTOKEN_KEY     = 'gm_gtoken';
 const GM_GTOKEN_EXP_KEY = 'gm_gtoken_exp';
 const GM_CLIENT_ID_KEY  = 'gm_drive_client_id';
@@ -3425,6 +3426,8 @@ window.addEventListener('DOMContentLoaded', function() {
     setTimeout(gmMostrarVencimientos, 800);
     // Módulo Share Target: detectar mail compartido desde Gmail
     gmCheckShareTarget();
+    // Módulo Gmail API: chequear mails de Santander automáticamente en PC
+    gmGmailChequear();
 
     // Splash: cierre independiente — no depende de async (restaurarCarpetaGuardada)
     const splash = document.getElementById('splash');
@@ -3595,7 +3598,151 @@ function gmCargarCuentasShare() {
     });
 }
 
-// ── Clave localStorage para gasto pendiente ──
+// ════════════════════════════════════════════════════
+//  MÓDULO GMAIL API · Detección automática mails Santander
+// ════════════════════════════════════════════════════
+
+const GM_SANTANDER_FROM = 'mensajesyavisos@mails.santander.com.ar';
+
+function gmGmailGetProcessed() {
+    try { return JSON.parse(localStorage.getItem(GM_GMAIL_PROCESSED_KEY)) || []; }
+    catch(e) { return []; }
+}
+
+function gmGmailMarkProcessed(id) {
+    const lista = gmGmailGetProcessed();
+    if (!lista.includes(id)) {
+        lista.push(id);
+        // Mantener solo los últimos 100 IDs para no crecer indefinidamente
+        if (lista.length > 100) lista.splice(0, lista.length - 100);
+        try { localStorage.setItem(GM_GMAIL_PROCESSED_KEY, JSON.stringify(lista)); } catch(e) {}
+    }
+}
+
+function gmGmailIsProcessed(id) {
+    return gmGmailGetProcessed().includes(id);
+}
+
+// Decodifica base64url a texto
+function gmGmailDecodeBody(encoded) {
+    try {
+        const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+        return decodeURIComponent(escape(atob(b64)));
+    } catch(e) { return ''; }
+}
+
+// Extrae texto plano de un mensaje Gmail
+function gmGmailExtraerTexto(payload) {
+    if (!payload) return '';
+    // Parte directa
+    if (payload.body && payload.body.data) {
+        return gmGmailDecodeBody(payload.body.data);
+    }
+    // Buscar en parts
+    if (payload.parts) {
+        for (const part of payload.parts) {
+            if (part.mimeType === 'text/plain' && part.body && part.body.data) {
+                return gmGmailDecodeBody(part.body.data);
+            }
+        }
+        // Si no hay text/plain, buscar text/html como fallback
+        for (const part of payload.parts) {
+            if (part.mimeType === 'text/html' && part.body && part.body.data) {
+                const html = gmGmailDecodeBody(part.body.data);
+                // Convertir HTML a texto básico
+                return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            }
+            // Partes anidadas (multipart)
+            if (part.parts) {
+                const sub = gmGmailExtraerTexto(part);
+                if (sub) return sub;
+            }
+        }
+    }
+    return '';
+}
+
+async function gmGmailBuscarGastos(token) {
+    // Buscar mails de Santander no leídos o recientes (últimos 30 días)
+    const query = encodeURIComponent(`from:${GM_SANTANDER_FROM} newer_than:30d`);
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=10`;
+
+    const resp = await fetch(url, {
+        headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!resp.ok) {
+        console.error('[Gmail] Error buscando mails:', resp.status);
+        return [];
+    }
+    const data = await resp.json();
+    if (!data.messages || data.messages.length === 0) return [];
+
+    const gastosPendientes = [];
+
+    for (const msg of data.messages) {
+        // Saltar ya procesados
+        if (gmGmailIsProcessed(msg.id)) continue;
+
+        // Obtener detalle del mensaje
+        const detResp = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
+            { headers: { Authorization: 'Bearer ' + token } }
+        );
+        if (!detResp.ok) continue;
+        const det = await detResp.json();
+
+        const texto = gmGmailExtraerTexto(det.payload);
+        if (!texto) continue;
+
+        const datos = gmParsearMailSantander(texto);
+        if (datos) {
+            datos._gmailId = msg.id;
+            gastosPendientes.push(datos);
+        }
+    }
+
+    return gastosPendientes;
+}
+
+// Cola de gastos pendientes de Gmail
+let gmGmailPendientesQueue = [];
+let gmGmailPendienteIndex  = 0;
+
+function gmGmailMostrarSiguiente() {
+    if (gmGmailPendienteIndex >= gmGmailPendientesQueue.length) return;
+    const datos = gmGmailPendientesQueue[gmGmailPendienteIndex];
+    gmCargarCuentasShare();
+    gmAbrirShareModal(datos);
+    // Indicador si hay más de uno
+    const header = document.querySelector('#share-modal .share-header h3');
+    if (header && gmGmailPendientesQueue.length > 1) {
+        header.textContent = `Gasto detectado (${gmGmailPendienteIndex + 1}/${gmGmailPendientesQueue.length})`;
+    }
+}
+
+async function gmGmailChequear() {
+    if (gmEsMovil()) return; // Solo en PC
+    const clientId = gmGetClientId();
+    if (!clientId) return;
+    if (!gmGTokenCargarLocal()) return; // Solo si ya hay sesión activa
+
+    console.log('[Gmail] Chequeando mails de Santander...');
+    try {
+        const gastos = await gmGmailBuscarGastos(gmGToken);
+        if (gastos.length === 0) {
+            console.log('[Gmail] Sin gastos nuevos.');
+            return;
+        }
+        console.log(`[Gmail] ${gastos.length} gasto(s) nuevo(s) encontrado(s).`);
+        gmGmailPendientesQueue = gastos;
+        gmGmailPendienteIndex  = 0;
+        setTimeout(gmGmailMostrarSiguiente, 1000);
+    } catch(e) {
+        console.error('[Gmail] Error:', e.message);
+    }
+}
+
+// ── Reemplazar gmConfirmarShare para manejar cola Gmail ──
 const GM_SHARE_PENDING_KEY = 'gm_share_pending';
 
 function gmEsMovil() {
@@ -3656,22 +3803,43 @@ function gmConfirmarShare() {
     resetPaginacion();
     render();
 
+    // Marcar mail de Gmail como procesado
+    const datosCurrent = gmGmailPendientesQueue[gmGmailPendienteIndex];
+    if (datosCurrent && datosCurrent._gmailId) {
+        gmGmailMarkProcessed(datosCurrent._gmailId);
+    }
+    // Limpiar pendiente Share Target
     gmLimpiarPendiente();
+
     document.getElementById('share-overlay').classList.remove('active');
     toast(`✅ Gasto registrado: ${conceptoFinal}`, 'success');
 
     if (window.history && window.history.replaceState) {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
+
+    // Mostrar siguiente gasto de la cola si hay más
+    gmGmailPendienteIndex++;
+    if (gmGmailPendienteIndex < gmGmailPendientesQueue.length) {
+        setTimeout(gmGmailMostrarSiguiente, 600);
+    }
 }
 
 function gmCerrarShare() {
-    // En PC cancelar descarta el pendiente
-    // En móvil no debería llegar acá, pero por las dudas limpia URL
+    // Marcar como procesado aunque se cancele (para no volver a mostrar)
+    const datosCurrent = gmGmailPendientesQueue[gmGmailPendienteIndex];
+    if (datosCurrent && datosCurrent._gmailId) {
+        gmGmailMarkProcessed(datosCurrent._gmailId);
+    }
     gmLimpiarPendiente();
     document.getElementById('share-overlay').classList.remove('active');
     if (window.history && window.history.replaceState) {
         window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    // Mostrar siguiente si hay más
+    gmGmailPendienteIndex++;
+    if (gmGmailPendienteIndex < gmGmailPendientesQueue.length) {
+        setTimeout(gmGmailMostrarSiguiente, 400);
     }
 }
 
