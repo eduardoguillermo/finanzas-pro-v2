@@ -1,5 +1,5 @@
-// FinanzasPro Ledger · Service Worker v13.77 · 2026-06-29 UTC · Share Target Module
-const CACHE_NAME = 'finanzas-pro-v13.77';
+// FinanzasPro Ledger · Service Worker v13.78 · 2026-06-29 UTC · Share Target Module
+const CACHE_NAME = 'finanzas-pro-v13.78';
 const ASSETS = ['./index.html', './manifest.json', './xlsx.full.min.js'];
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE_NAME).then(cache => Promise.all(ASSETS.map(asset => fetch(`${asset}?v=${Date.now()}`, { cache: 'no-store' }).then(res => { if (res.ok) cache.put(asset, res); }).catch(() => {}))))); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
