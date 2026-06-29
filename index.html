@@ -3595,6 +3595,31 @@ function gmCargarCuentasShare() {
     });
 }
 
+// ── Clave localStorage para gasto pendiente ──
+const GM_SHARE_PENDING_KEY = 'gm_share_pending';
+
+function gmEsMovil() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+           window.innerWidth < 768;
+}
+
+function gmGuardarPendiente(datos) {
+    try {
+        localStorage.setItem(GM_SHARE_PENDING_KEY, JSON.stringify(datos));
+    } catch(e) {}
+}
+
+function gmLeerPendiente() {
+    try {
+        const raw = localStorage.getItem(GM_SHARE_PENDING_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
+}
+
+function gmLimpiarPendiente() {
+    localStorage.removeItem(GM_SHARE_PENDING_KEY);
+}
+
 function gmConfirmarShare() {
     const monto    = parseFloat(document.getElementById('share-monto').value);
     const moneda   = document.getElementById('share-moneda').value;
@@ -3605,11 +3630,10 @@ function gmConfirmarShare() {
     const cuotas   = parseInt(document.getElementById('share-cuotas').value) || 1;
     const notas    = document.getElementById('share-notas').value.trim();
 
-    if (!comercio)        { toast('Ingresá el nombre del comercio.', 'error'); return; }
+    if (!comercio)               { toast('Ingresá el nombre del comercio.', 'error'); return; }
     if (isNaN(monto) || monto <= 0) { toast('El monto no es válido.', 'error'); return; }
-    if (isNaN(rubroId))   { toast('Seleccioná un rubro.', 'error'); return; }
+    if (isNaN(rubroId))          { toast('Seleccioná un rubro.', 'error'); return; }
 
-    // Construir concepto
     const conceptoFinal = moneda === 'USD'
         ? `[USD ${monto.toFixed(2)}] ${comercio}`
         : comercio;
@@ -3617,34 +3641,34 @@ function gmConfirmarShare() {
     const mov = {
         id:      DB.nid++,
         concepto: conceptoFinal,
-        monto:   monto,
-        rubroId: rubroId,
+        monto,
+        rubroId,
         origen:  cuenta,
         destino: null,
-        fecha:   fecha,
-        notas:   notas || undefined
+        fecha,
+        notas:   cuotas > 1
+            ? `${cuotas} cuotas${notas ? ' · ' + notas : ''}`
+            : (notas || undefined)
     };
-
-    // Si tiene cuotas múltiples, agregar nota
-    if (cuotas > 1) {
-        mov.notas = `${cuotas} cuotas${notas ? ' · ' + notas : ''}`;
-    }
 
     DB.movimientos.push(mov);
     save();
     resetPaginacion();
     render();
 
+    gmLimpiarPendiente();
     document.getElementById('share-overlay').classList.remove('active');
     toast(`✅ Gasto registrado: ${conceptoFinal}`, 'success');
 
-    // Limpiar URL para no re-disparar en refresh
     if (window.history && window.history.replaceState) {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 }
 
 function gmCerrarShare() {
+    // En PC cancelar descarta el pendiente
+    // En móvil no debería llegar acá, pero por las dudas limpia URL
+    gmLimpiarPendiente();
     document.getElementById('share-overlay').classList.remove('active');
     if (window.history && window.history.replaceState) {
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -3652,36 +3676,52 @@ function gmCerrarShare() {
 }
 
 function gmCheckShareTarget() {
-    const params = new URLSearchParams(window.location.search);
+    const params     = new URLSearchParams(window.location.search);
     const shareText  = params.get('share_text')  || '';
     const shareTitle = params.get('share_title') || '';
-    const texto = shareText || shareTitle;
-    if (!texto) return;
+    const texto      = shareText || shareTitle;
 
-    console.log('[ShareTarget] Texto recibido:', texto.substring(0, 120));
-
-    const abrirModal = () => {
-        gmCargarCuentasShare();
+    if (texto) {
+        // Llegó texto nuevo desde Share Target (siempre desde móvil)
+        console.log('[ShareTarget] Texto recibido:', texto.substring(0, 120));
         const datos = gmParsearMailSantander(texto);
-        if (datos) {
-            console.log('[ShareTarget] Datos parseados:', JSON.stringify(datos));
-            gmAbrirShareModal(datos);
-        } else {
-            console.log('[ShareTarget] No reconocido, abriendo vacío');
-            gmAbrirShareModal({
-                moneda: 'ARS', monto: null,
-                comercio: texto.substring(0, 60),
-                fecha: hoyISO(), cuotas: 1, tarjeta: '', tipo_tarjeta: ''
-            });
-            const warn = document.getElementById('share-warn');
-            if (warn) {
-                warn.style.display = 'block';
-                warn.textContent = '⚠️ No se reconoció el formato del mail. Revisá los campos.';
-            }
-        }
-    };
+        const pendiente = datos || {
+            moneda: 'ARS', monto: null,
+            comercio: texto.substring(0, 60),
+            fecha: hoyISO(), cuotas: 1, tarjeta: '', tipo_tarjeta: '',
+            sinReconocer: true
+        };
+        gmGuardarPendiente(pendiente);
 
-    setTimeout(abrirModal, 900);
+        // En móvil: solo toast, no abrir modal
+        if (gmEsMovil()) {
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            setTimeout(() => {
+                toast('📧 Gasto guardado. Abrí en PC para registrarlo.', 'info');
+            }, 900);
+            return;
+        }
+    }
+
+    // En PC: verificar si hay pendiente guardado y mostrar modal
+    if (!gmEsMovil()) {
+        const pendiente = gmLeerPendiente();
+        if (pendiente) {
+            setTimeout(() => {
+                gmCargarCuentasShare();
+                gmAbrirShareModal(pendiente);
+                if (pendiente.sinReconocer) {
+                    const warn = document.getElementById('share-warn');
+                    if (warn) {
+                        warn.style.display = 'block';
+                        warn.textContent = '⚠️ No se reconoció el formato del mail. Revisá los campos.';
+                    }
+                }
+            }, 900);
+        }
+    }
 }
 </script>
 
