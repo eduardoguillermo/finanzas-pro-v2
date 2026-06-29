@@ -498,7 +498,7 @@
 <!-- SPLASH -->
 <div id="splash">
     <div class="splash-logo">Finanzas<span>Pro</span></div>
-    <div class="splash-version" style="display:flex;align-items:baseline;gap:8px;justify-content:center;">v13.84 · Ledger Edition <span style="font-family:'Dancing Script',cursive;font-size:17px;color:#93c5fd;">especial para Mariela</span></div>
+    <div class="splash-version" style="display:flex;align-items:baseline;gap:8px;justify-content:center;">v13.85 · Ledger Edition <span style="font-family:'Dancing Script',cursive;font-size:17px;color:#93c5fd;">especial para Mariela</span></div>
     <div style="position:absolute;bottom:18%;right:8%;font-family:'Dancing Script',cursive;font-size:32px;color:#93c5fd;pointer-events:none">Development by Guille</div>
     <div class="splash-progress-track">
         <div class="splash-progress-bar" id="splash-bar"></div>
@@ -783,7 +783,7 @@
 // ════════════════════════════════════════════════════
 //  CONSTANTES Y ESTADO GLOBAL
 // ════════════════════════════════════════════════════
-const APP_VERSION = '13.84';
+const APP_VERSION = '13.85';
 
 // ── Google Drive (desactivado hasta que el usuario configure Client ID) ─────
 const GM_DRIVE_SCOPE    = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/gmail.readonly';
@@ -3432,10 +3432,6 @@ window.addEventListener('DOMContentLoaded', function() {
     render();
     setTimeout(gmMostrarVencimientos, 800);
     // Módulo Share Target: detectar mail compartido desde Gmail
-    // Mover share-overlay al tope del DOM para evitar problemas de stacking context
-    const _shareOv = document.getElementById('share-overlay');
-    if (_shareOv) document.body.appendChild(_shareOv);
-
     gmCheckShareTarget();
     // Módulo Gmail API: chequear mails de Santander automáticamente en PC
     gmGmailChequear();
@@ -3550,25 +3546,11 @@ function gmAbrirShareModal(datos) {
     const overlay = document.getElementById('share-overlay');
     if (!overlay) return;
 
-    // Forzar estilos via setProperty para garantizar !important
+    // Primero ocultar, mover al body, luego mostrar
+    overlay.style.display = 'none';
     document.body.appendChild(overlay);
-    const s = overlay.style;
-    s.setProperty('display',          'flex',              'important');
-    s.setProperty('position',         'fixed',             'important');
-    s.setProperty('top',              '0',                 'important');
-    s.setProperty('left',             '0',                 'important');
-    s.setProperty('right',            '0',                 'important');
-    s.setProperty('bottom',           '0',                 'important');
-    s.setProperty('width',            '100vw',             'important');
-    s.setProperty('height',           '100vh',             'important');
-    s.setProperty('background-color', 'rgba(0,0,0,0.65)', 'important');
-    s.setProperty('z-index',          '999999',            'important');
-    s.setProperty('align-items',      'center',            'important');
-    s.setProperty('justify-content',  'center',            'important');
-    s.setProperty('padding',          '16px',              'important');
-    s.setProperty('box-sizing',       'border-box',        'important');
 
-    // Poblar campos
+    // Poblar campos primero
     document.getElementById('share-monto').value    = datos.monto ? datos.monto.toFixed(2) : '';
     document.getElementById('share-moneda').value   = datos.moneda || 'ARS';
     document.getElementById('share-comercio').value = datos.comercio || '';
@@ -3605,7 +3587,20 @@ function gmAbrirShareModal(datos) {
         warn.style.display = 'none';
     }
 
-    // overlay activado via style inline en gmAbrirShareModal
+    // Mostrar overlay con estilos forzados
+    const s = overlay.style;
+    s.setProperty('position',         'fixed',             'important');
+    s.setProperty('top',              '0',                 'important');
+    s.setProperty('left',             '0',                 'important');
+    s.setProperty('width',            '100vw',             'important');
+    s.setProperty('height',           '100vh',             'important');
+    s.setProperty('background-color', 'rgba(0,0,0,0.72)', 'important');
+    s.setProperty('z-index',          '999999',            'important');
+    s.setProperty('align-items',      'center',            'important');
+    s.setProperty('justify-content',  'center',            'important');
+    s.setProperty('padding',          '16px',              'important');
+    s.setProperty('box-sizing',       'border-box',        'important');
+    s.setProperty('display',          'flex',              'important');
 }
 
 function gmCargarRubrosShare() {
