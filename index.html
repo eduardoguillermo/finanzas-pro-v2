@@ -789,7 +789,8 @@ const GM_CLIENT_ID_KEY  = 'gm_drive_client_id';
 let gmGToken = null;
 let gmDriveFileId = null;
 
-function gmGetClientId() { return localStorage.getItem(GM_CLIENT_ID_KEY) || ''; }
+const GM_HARDCODED_CLIENT_ID = '1049169592532-is5j1j4s1bmgrc9tsq48slrgul8fbj17.apps.googleusercontent.com';
+function gmGetClientId() { return localStorage.getItem(GM_CLIENT_ID_KEY) || GM_HARDCODED_CLIENT_ID; }
 function gmGuardarClientId() {
     const val = document.getElementById('cfg-drive-client-id').value.trim();
     localStorage.setItem(GM_CLIENT_ID_KEY, val);
