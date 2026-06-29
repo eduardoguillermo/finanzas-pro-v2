@@ -762,6 +762,7 @@
             <button class="btn-secondary btn-sm" onclick="document.getElementById('file-import').click()">📤 Importar</button>
             <button class="btn-secondary btn-sm" id="btn-gm-drive-up" onclick="gmDriveSubir()" title="Subir backup a Drive" style="display:none;background:#4285f4;color:white;border-color:#4285f4;">☁️ Drive</button>
             <button class="btn-secondary btn-sm" id="btn-gm-drive-down" onclick="gmDriveRestaurar()" title="Restaurar desde Drive" style="display:none;background:#4285f4;color:white;border-color:#4285f4;">📂 Drive</button>
+            <button class="btn-secondary btn-sm" id="btn-gm-gmail-sync" onclick="gmGmailLoginYChequear()" title="Leer mails de Santander" style="display:none;background:#ea4335;color:white;border-color:#ea4335;">📧 Gmail</button>
             <button class="btn-secondary btn-sm" onclick="gmAbrirAhorros()" style="background:#0d9488;color:white;border-color:#0d9488;">💰 Ahorros</button>
             <button class="btn-secondary btn-sm" onclick="gmAbrirTortas()" title="Gastos por rubro" style="background:#b45309;color:white;border-color:#b45309;">🥧 Rubros</button>
             <button class="btn-secondary btn-sm" onclick="gmAbrirHistorial()" title="Ver historial mensual" style="background:#6d28d9;color:white;border-color:#6d28d9;">📅 Historial</button>
@@ -801,8 +802,9 @@ function gmGuardarClientId() {
 }
 function gmActualizarBotonesDrive() {
     const tiene = !!gmGetClientId();
-    document.getElementById('btn-gm-drive-up').style.display   = tiene ? '' : 'none';
-    document.getElementById('btn-gm-drive-down').style.display = tiene ? '' : 'none';
+    document.getElementById('btn-gm-drive-up').style.display    = tiene ? '' : 'none';
+    document.getElementById('btn-gm-drive-down').style.display  = tiene ? '' : 'none';
+    document.getElementById('btn-gm-gmail-sync').style.display  = tiene && !gmEsMovil() ? '' : 'none';
 }
 function gmGTokenGuardar(token, expiresIn) {
     const exp = Date.now() + (expiresIn||3500)*1000;
@@ -3719,6 +3721,26 @@ function gmGmailMostrarSiguiente() {
     if (header && gmGmailPendientesQueue.length > 1) {
         header.textContent = `Gasto detectado (${gmGmailPendienteIndex + 1}/${gmGmailPendientesQueue.length})`;
     }
+}
+
+// Login explícito con scope Gmail + chequear mails
+function gmGmailLoginYChequear() {
+    const clientId = gmGetClientId();
+    if (!clientId) { toast('Configurá el Client ID primero.', 'error'); return; }
+    gmGTokenLimpiar(); // Forzar nuevo login para pedir scope Gmail
+    gmCargarGoogle(() => {
+        const client = google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: GM_DRIVE_SCOPE,
+            callback: resp => {
+                if (resp.error) { toast('Error Google: ' + resp.error, 'error'); return; }
+                gmGTokenGuardar(resp.access_token, resp.expires_in);
+                toast('✅ Conectado con Google', 'success');
+                gmGmailChequear();
+            }
+        });
+        client.requestAccessToken({ prompt: 'consent' });
+    });
 }
 
 async function gmGmailChequear() {
